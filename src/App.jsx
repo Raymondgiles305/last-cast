@@ -30,6 +30,15 @@ function inDays(d) {
 function formatDate(date) {
   return date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
 }
+function formatDateTime(date) {
+  return date.toLocaleString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
 
 const CHARTERS = [
   {
@@ -211,6 +220,55 @@ const STANDARD_CHARTERS = [
     licenseNote: "Wisconsin fishing license required — bring your own",
     weatherNote: "Captain may reschedule for unsafe weather; you'll be notified as early as possible.",
     reviews: [{ name: "Pete H.", rating: 5, comment: "20 years on the water shows — best walleye trip we've had." }],
+  },
+];
+
+// Whole-boat private charters — sold as one flat trip price with a guest cap,
+// not per seat. Common for swordfishing and other dedicated-boat trips.
+const PRIVATE_CHARTERS = [
+  {
+    id: "p1",
+    saleType: "private",
+    captain: "Capt. Nico Fuentes",
+    boat: "Deep Drop",
+    location: "Fort Lauderdale, FL",
+    meetingPoint: "Bahia Mar Marina",
+    species: ["Swordfish"],
+    type: "Offshore",
+    departure: inDays(5),
+    duration: "10 hrs (overnight)",
+    maxGuests: 6,
+    totalPrice: 1800,
+    rating: 4.9,
+    img: "linear-gradient(135deg,#1c2d3a,#0e1b22)",
+    captainYears: 16,
+    licensed: true,
+    included: ["Rods & electric reels", "Bait & rigs", "Ice & cooler", "Fish cleaning"],
+    licenseNote: "No fishing license needed — covered by the charter",
+    weatherNote: "Captain may reschedule for unsafe weather; you'll be notified as early as possible.",
+    reviews: [{ name: "Chris D.", rating: 5, comment: "Boated a 90lb swordfish overnight, unreal trip for the whole crew." }],
+  },
+  {
+    id: "p2",
+    saleType: "private",
+    captain: "Capt. Renee Alvarez",
+    boat: "Salt Life",
+    location: "Islamorada, FL",
+    meetingPoint: "Whale Harbor Marina",
+    species: ["Sailfish", "Mahi"],
+    type: "Offshore",
+    departure: inDays(11),
+    duration: "8 hrs",
+    maxGuests: 4,
+    totalPrice: 1400,
+    rating: 5.0,
+    img: "linear-gradient(135deg,#2c3e50,#0e1b22)",
+    captainYears: 12,
+    licensed: true,
+    included: ["Rods & tackle", "Bait", "Ice & cooler", "Fish cleaning"],
+    licenseNote: "No fishing license needed — covered by the charter",
+    weatherNote: "Captain may reschedule for unsafe weather; you'll be notified as early as possible.",
+    reviews: [{ name: "Marissa T.", rating: 5, comment: "Private boat for our group was worth every penny." }],
   },
 ];
 
@@ -522,12 +580,48 @@ function BrowseListingCard({ c, onSelect }) {
           {c.species.map((s) => (
             <Tag key={s} tone="teal">{s}</Tag>
           ))}
-          <Tag tone="gold">{formatDate(c.departure)}</Tag>
         </div>
       </div>
       <div className="text-right flex-shrink-0">
         <PriceBlock price={c.price} originalPrice={c.originalPrice} />
-        <div style={{ fontSize: 11, marginTop: 4, color: COLORS.paperDim }}>{c.spotsLeft} seats left</div>
+        <div style={{ fontSize: 11, marginTop: 4, color: COLORS.gold, fontFamily: MONO }}>{formatDateTime(c.departure)}</div>
+        <div style={{ fontSize: 10.5, marginTop: 2, color: COLORS.paperDim }}>{c.spotsLeft} seats left</div>
+      </div>
+    </button>
+  );
+}
+
+function PrivateCharterCard({ c, onSelect }) {
+  return (
+    <button
+      onClick={() => onSelect(c)}
+      className="flex flex-col gap-3 rounded-2xl p-3 text-left"
+      style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}
+    >
+      <div className="flex gap-3">
+        <div className="w-16 h-16 rounded-xl flex-shrink-0" style={{ background: c.img }} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <span className="truncate" style={{ color: COLORS.paper, fontWeight: 600, fontSize: 14 }}>{c.boat}</span>
+            <span className="flex-shrink-0" style={{ color: COLORS.gold, fontSize: 12 }}>★ {c.rating}</span>
+          </div>
+          <div className="truncate" style={{ color: COLORS.paperDim, fontSize: 12, marginTop: 1 }}>
+            {c.captain} · {c.location}
+          </div>
+          <div className="flex gap-1 mt-1.5 flex-wrap">
+            {c.species.map((s) => (
+              <Tag key={s} tone="teal">{s}</Tag>
+            ))}
+            <Tag tone="gold">Up to {c.maxGuests} guests</Tag>
+          </div>
+        </div>
+      </div>
+      <div className="flex items-center justify-between pt-2" style={{ borderTop: `1px solid ${COLORS.line}` }}>
+        <div>
+          <span style={{ fontFamily: MONO, color: COLORS.paper, fontSize: 18, fontWeight: 500 }}>${c.totalPrice}</span>
+          <span style={{ color: COLORS.paperDim, fontSize: 11, marginLeft: 5 }}>total trip</span>
+        </div>
+        <span style={{ fontSize: 11.5, color: COLORS.gold, fontFamily: MONO }}>{formatDateTime(c.departure)}</span>
       </div>
     </button>
   );
@@ -538,7 +632,7 @@ function Home({ onSelect, onCaptainPortal, onAccount, angler }) {
   const [category, setCategory] = useState("All");
   const [query, setQuery] = useState("");
 
-  const source = tab === "deals" ? CHARTERS : STANDARD_CHARTERS;
+  const source = tab === "deals" ? CHARTERS : tab === "browse" ? STANDARD_CHARTERS : PRIVATE_CHARTERS;
 
   const filtered = useMemo(() => {
     return source.filter((c) => {
@@ -598,7 +692,8 @@ function Home({ onSelect, onCaptainPortal, onAccount, angler }) {
         <div className="flex mt-5 rounded-full p-1" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
           {[
             { key: "deals", label: "⏱ Deals" },
-            { key: "browse", label: "Browse All Charters" },
+            { key: "browse", label: "Browse" },
+            { key: "private", label: "Private" },
           ].map((t) => {
             const active = tab === t.key;
             return (
@@ -667,6 +762,9 @@ function Home({ onSelect, onCaptainPortal, onAccount, angler }) {
                   <div className="mt-2 text-xs">
                     <CountdownLabel target={c.departure} />
                   </div>
+                  <div style={{ fontSize: 10.5, color: COLORS.paperDim, marginTop: 2, fontFamily: MONO }}>
+                    {formatDateTime(c.departure)}
+                  </div>
                   <div className="mt-2">
                     <PriceBlock price={c.price} originalPrice={c.originalPrice} />
                   </div>
@@ -679,14 +777,16 @@ function Home({ onSelect, onCaptainPortal, onAccount, angler }) {
 
       <div className="px-6 pt-2 pb-10" style={{ background: COLORS.ink }}>
         <h2 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 19, fontWeight: 600, marginBottom: 12 }}>
-          {tab === "deals" ? "All open seats" : "Upcoming charters"}
+          {tab === "deals" ? "All open seats" : tab === "browse" ? "Upcoming charters" : "Whole-boat charters"}
         </h2>
         <div className="flex flex-col gap-3">
           {filtered.length === 0 && (
             <div style={{ color: COLORS.paperDim, fontSize: 14 }}>
               {tab === "deals"
                 ? "No open seats match that search right now — try another spot or species."
-                : "No upcoming charters match that search — try another spot or species."}
+                : tab === "browse"
+                ? "No upcoming charters match that search — try another spot or species."
+                : "No private charters match that search — try another spot or species."}
             </div>
           )}
           {tab === "deals" &&
@@ -718,10 +818,14 @@ function Home({ onSelect, onCaptainPortal, onAccount, angler }) {
                   <div style={{ fontSize: 11, marginTop: 4 }}>
                     <CountdownLabel target={c.departure} />
                   </div>
+                  <div style={{ fontSize: 10.5, marginTop: 2, color: COLORS.paperDim, fontFamily: MONO }}>
+                    {formatDateTime(c.departure)}
+                  </div>
                 </div>
               </button>
             ))}
           {tab === "browse" && filtered.map((c) => <BrowseListingCard key={c.id} c={c} onSelect={onSelect} />)}
+          {tab === "private" && filtered.map((c) => <PrivateCharterCard key={c.id} c={c} onSelect={onSelect} />)}
         </div>
       </div>
     </div>
@@ -770,6 +874,7 @@ function Detail({ charter, onBack, onBook }) {
             <Tag key={s} tone="teal">{s}</Tag>
           ))}
           <Tag tone="gold">{charter.type}</Tag>
+          {charter.saleType === "private" && <Tag tone="rust">Whole boat · up to {charter.maxGuests} guests</Tag>}
           {charter.groupType && (
             <Tag tone="rust">{charter.groupType === "private" ? "Private charter" : "Shared / walk-on"}</Tag>
           )}
@@ -778,11 +883,20 @@ function Detail({ charter, onBack, onBook }) {
         <div className="mt-5 rounded-2xl p-4 flex items-center justify-between" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
           <div>
             <div style={{ color: COLORS.paperDim, fontSize: 12, fontFamily: MONO }}>DEPARTS</div>
-            <div style={{ color: COLORS.paper, fontSize: 15, fontWeight: 600, marginTop: 2 }}>
-              <CountdownLabel target={charter.departure} />
-            </div>
+            {charter.reason ? (
+              <>
+                <div style={{ color: COLORS.paper, fontSize: 15, fontWeight: 600, marginTop: 2 }}>
+                  <CountdownLabel target={charter.departure} />
+                </div>
+                <div style={{ color: COLORS.paperDim, fontSize: 12, marginTop: 2 }}>{formatDateTime(charter.departure)}</div>
+              </>
+            ) : (
+              <div style={{ color: COLORS.paper, fontSize: 15, fontWeight: 600, marginTop: 2 }}>
+                {formatDateTime(charter.departure)}
+              </div>
+            )}
           </div>
-          <CastRing target={charter.departure} size={48} />
+          {charter.reason && <CastRing target={charter.departure} size={48} />}
         </div>
 
         <div className="grid grid-cols-2 gap-3 mt-3">
@@ -790,12 +904,19 @@ function Detail({ charter, onBack, onBook }) {
             <div style={{ color: COLORS.paperDim, fontSize: 12, fontFamily: MONO }}>TRIP LENGTH</div>
             <div style={{ color: COLORS.paper, fontSize: 15, fontWeight: 600, marginTop: 2 }}>{charter.duration}</div>
           </div>
-          <div className="rounded-2xl p-4" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
-            <div style={{ color: COLORS.paperDim, fontSize: 12, fontFamily: MONO }}>SEATS LEFT</div>
-            <div style={{ color: COLORS.rust, fontSize: 15, fontWeight: 600, marginTop: 2 }}>
-              {charter.spotsLeft} of {charter.totalSpots}
+          {charter.saleType === "private" ? (
+            <div className="rounded-2xl p-4" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
+              <div style={{ color: COLORS.paperDim, fontSize: 12, fontFamily: MONO }}>MAX GUESTS</div>
+              <div style={{ color: COLORS.gold, fontSize: 15, fontWeight: 600, marginTop: 2 }}>Up to {charter.maxGuests}</div>
             </div>
-          </div>
+          ) : (
+            <div className="rounded-2xl p-4" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
+              <div style={{ color: COLORS.paperDim, fontSize: 12, fontFamily: MONO }}>SEATS LEFT</div>
+              <div style={{ color: COLORS.rust, fontSize: 15, fontWeight: 600, marginTop: 2 }}>
+                {charter.spotsLeft} of {charter.totalSpots}
+              </div>
+            </div>
+          )}
         </div>
 
         {charter.meetingPoint && (
@@ -827,7 +948,9 @@ function Detail({ charter, onBack, onBook }) {
         )}
 
         <p style={{ color: COLORS.paperDim, fontSize: 14, lineHeight: 1.6, marginTop: 18 }}>
-          {charter.reason
+          {charter.saleType === "private"
+            ? `Book the whole boat with ${charter.captain} — up to ${charter.maxGuests} guests, one flat price, no strangers aboard. Bring your own crew.`
+            : charter.reason
             ? `${charter.captain.split(" ")[1]} opened this trip up after a cancellation — everything's still on: gear, bait, and a boat that already knows where the fish are. First come, first reeled.`
             : `A regular trip with ${charter.captain}, departing ${formatDate(charter.departure)} — gear and bait included, just bring yourself.`}
         </p>
@@ -862,7 +985,17 @@ function Detail({ charter, onBack, onBook }) {
         className="fixed bottom-0 left-0 right-0 px-6 py-4 flex items-center justify-between"
         style={{ background: COLORS.ink, borderTop: `1px solid ${COLORS.line}`, maxWidth: 480, margin: "0 auto" }}
       >
-        {charter.spotsLeft > 0 ? (
+        {charter.saleType === "private" ? (
+          <>
+            <div>
+              <span style={{ fontFamily: MONO, color: COLORS.paper, fontSize: 20, fontWeight: 500 }}>${charter.totalPrice}</span>
+              <div style={{ fontSize: 11, color: COLORS.paperDim }}>total trip · up to {charter.maxGuests} guests</div>
+            </div>
+            <button onClick={onBook} className="px-6 py-3 rounded-full font-semibold text-sm" style={{ background: COLORS.rust, color: COLORS.paper }}>
+              Book this charter
+            </button>
+          </>
+        ) : charter.spotsLeft > 0 ? (
           <>
             <PriceBlock price={charter.price} originalPrice={charter.originalPrice} />
             <button onClick={onBook} className="px-6 py-3 rounded-full font-semibold text-sm" style={{ background: COLORS.rust, color: COLORS.paper }}>
@@ -889,8 +1022,10 @@ function Booking({ charter, onBack, onConfirm }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [spots, setSpots] = useState(1);
-  const isWaitlist = charter.spotsLeft <= 0;
+  const isPrivate = charter.saleType === "private";
+  const isWaitlist = !isPrivate && charter.spotsLeft <= 0;
   const valid = name.trim().length > 1 && email.includes("@");
+  const total = isPrivate ? charter.totalPrice : charter.price * spots;
 
   return (
     <div style={{ background: COLORS.ink, minHeight: "100%" }} className="px-6 pt-6 pb-10">
@@ -898,10 +1033,10 @@ function Booking({ charter, onBack, onConfirm }) {
         ← Back
       </button>
       <h1 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 24, fontWeight: 600 }}>
-        {isWaitlist ? "Join the waitlist" : "Claim your seat"}
+        {isPrivate ? "Book this charter" : isWaitlist ? "Join the waitlist" : "Claim your seat"}
       </h1>
       <div style={{ color: COLORS.paperDim, fontSize: 13, marginTop: 4 }}>
-        {charter.boat} · {isWaitlist ? "Sold out — we'll text you if a seat opens up" : <CountdownLabel target={charter.departure} />}
+        {charter.boat} · {isPrivate ? formatDateTime(charter.departure) : isWaitlist ? "Sold out — we'll text you if a seat opens up" : <CountdownLabel target={charter.departure} />}
       </div>
 
       <div className="mt-6 flex flex-col gap-4">
@@ -909,13 +1044,19 @@ function Booking({ charter, onBack, onConfirm }) {
         <Field label="EMAIL" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@email.com" />
         {!isWaitlist && (
           <label className="flex flex-col gap-1.5">
-            <span style={{ color: COLORS.paperDim, fontSize: 12, fontFamily: MONO }}>SEATS</span>
+            <span style={{ color: COLORS.paperDim, fontSize: 12, fontFamily: MONO }}>
+              {isPrivate ? `GUESTS (UP TO ${charter.maxGuests})` : "SEATS"}
+            </span>
             <div className="flex items-center gap-3">
               <button onClick={() => setSpots((s) => Math.max(1, s - 1))} className="w-9 h-9 rounded-full" style={{ background: COLORS.inkSoft, color: COLORS.paper, border: `1px solid ${COLORS.line}` }}>
                 −
               </button>
               <span style={{ color: COLORS.paper, fontFamily: MONO, fontSize: 16 }}>{spots}</span>
-              <button onClick={() => setSpots((s) => Math.min(charter.spotsLeft, s + 1))} className="w-9 h-9 rounded-full" style={{ background: COLORS.inkSoft, color: COLORS.paper, border: `1px solid ${COLORS.line}` }}>
+              <button
+                onClick={() => setSpots((s) => Math.min(isPrivate ? charter.maxGuests : charter.spotsLeft, s + 1))}
+                className="w-9 h-9 rounded-full"
+                style={{ background: COLORS.inkSoft, color: COLORS.paper, border: `1px solid ${COLORS.line}` }}
+              >
                 +
               </button>
             </div>
@@ -929,13 +1070,15 @@ function Booking({ charter, onBack, onConfirm }) {
           </p>
         ) : (
           <div className="rounded-2xl p-4 mt-2 flex items-center justify-between" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
-            <span style={{ color: COLORS.paperDim, fontSize: 13 }}>Total ({spots} seat{spots > 1 ? "s" : ""})</span>
-            <span style={{ color: COLORS.paper, fontFamily: MONO, fontSize: 18, fontWeight: 500 }}>${charter.price * spots}</span>
+            <span style={{ color: COLORS.paperDim, fontSize: 13 }}>
+              {isPrivate ? `Total trip · ${spots} guest${spots > 1 ? "s" : ""}` : `Total (${spots} seat${spots > 1 ? "s" : ""})`}
+            </span>
+            <span style={{ color: COLORS.paper, fontFamily: MONO, fontSize: 18, fontWeight: 500 }}>${total}</span>
           </div>
         )}
 
         <PrimaryButton disabled={!valid} onClick={() => onConfirm({ name, email, spots: isWaitlist ? 0 : spots, waitlist: isWaitlist })}>
-          {isWaitlist ? "Join waitlist" : "Confirm booking"}
+          {isPrivate ? "Confirm charter" : isWaitlist ? "Join waitlist" : "Confirm booking"}
         </PrimaryButton>
       </div>
     </div>
@@ -961,10 +1104,19 @@ function Confirmed({ charter, booking, onDone }) {
         <span style={{ fontSize: 26 }}>🎣</span>
       </div>
       <h1 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 24, fontWeight: 600 }}>
-        {booking.waitlist ? `You're on the list, ${booking.name.split(" ")[0]}.` : `Seat's yours, ${booking.name.split(" ")[0]}.`}
+        {charter.saleType === "private"
+          ? `Boat's yours, ${booking.name.split(" ")[0]}.`
+          : booking.waitlist
+          ? `You're on the list, ${booking.name.split(" ")[0]}.`
+          : `Seat's yours, ${booking.name.split(" ")[0]}.`}
       </h1>
       <p style={{ color: COLORS.paperDim, fontSize: 14, marginTop: 8, lineHeight: 1.6 }}>
-        {booking.waitlist ? (
+        {charter.saleType === "private" ? (
+          <>
+            {charter.captain} just got a text — you've got the whole boat for up to {charter.maxGuests} guests on the{" "}
+            {charter.boat}, departing {formatDateTime(charter.departure)}.
+          </>
+        ) : booking.waitlist ? (
           <>
             We'll text you the second a seat opens up on the {charter.boat}. No charge unless you confirm.
           </>
@@ -1472,7 +1624,10 @@ function PostCancellation({ onSave, onClose, initialValues }) {
     notes: initialValues?.notes || "",
   });
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
-  const valid = kind === "cancellation"
+  const isPrivate = kind === "private";
+  const valid = isPrivate
+    ? form.species && form.price && Number(form.spots) > 0 && form.date
+    : kind === "cancellation"
     ? form.species && form.price && Number(form.spots) > 0 && form.hours
     : form.species && form.price && Number(form.spots) > 0 && form.date;
 
@@ -1493,13 +1648,14 @@ function PostCancellation({ onSave, onClose, initialValues }) {
           {[
             { key: "cancellation", label: "Cancellation" },
             { key: "open", label: "Open Trip" },
+            { key: "private", label: "Private Charter" },
           ].map((t) => {
             const active = kind === t.key;
             return (
               <button
                 key={t.key}
                 onClick={() => setKind(t.key)}
-                className="flex-1 py-2 rounded-full text-sm font-medium transition"
+                className="flex-1 py-2 rounded-full text-xs font-medium transition"
                 style={{ background: active ? COLORS.rust : "transparent", color: active ? COLORS.paper : COLORS.paperDim }}
               >
                 {t.label}
@@ -1508,41 +1664,68 @@ function PostCancellation({ onSave, onClose, initialValues }) {
           })}
         </div>
 
+        {isPrivate && (
+          <p style={{ color: COLORS.paperDim, fontSize: 11.5, marginBottom: 14, lineHeight: 1.4 }}>
+            Sell the whole boat as one trip, like a swordfishing charter — a flat price for everyone you bring, not
+            per seat.
+          </p>
+        )}
+
         <div className="flex flex-col gap-4">
-          <Field label="SPECIES / TRIP TYPE" value={form.species} onChange={set("species")} placeholder="Snapper, Grouper" />
+          <Field
+            label={isPrivate ? "SPECIES / TRIP TYPE" : "SPECIES / TRIP TYPE"}
+            value={form.species}
+            onChange={set("species")}
+            placeholder={isPrivate ? "Swordfish" : "Snapper, Grouper"}
+          />
           <div className="grid grid-cols-2 gap-3">
-            <Field label="OPEN SEATS" type="number" min="1" value={form.spots} onChange={set("spots")} />
+            <Field
+              label={isPrivate ? "MAX GUESTS" : "OPEN SEATS"}
+              type="number"
+              min="1"
+              value={form.spots}
+              onChange={set("spots")}
+            />
             {kind === "cancellation" ? (
               <Field label="DEPARTS IN (HRS)" type="number" min="1" value={form.hours} onChange={set("hours")} />
             ) : (
               <Field label="TRIP DATE" type="date" value={form.date} onChange={set("date")} />
             )}
           </div>
-          <Field label="PRICE PER SEAT ($)" type="number" min="1" value={form.price} onChange={set("price")} placeholder="145" />
+          <Field
+            label={isPrivate ? "TOTAL TRIP PRICE ($)" : "PRICE PER SEAT ($)"}
+            type="number"
+            min="1"
+            value={form.price}
+            onChange={set("price")}
+            placeholder={isPrivate ? "1800" : "145"}
+          />
 
           <Field label="MEETING POINT" value={form.meetingPoint} onChange={set("meetingPoint")} placeholder="Harborwalk Marina, Dock C" />
 
-          <label className="flex flex-col gap-1.5">
-            <span style={{ color: COLORS.paperDim, fontSize: 12, fontFamily: MONO }}>GROUP TYPE</span>
-            <div className="flex rounded-full p-1" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
-              {[
-                { key: "shared", label: "Shared / walk-on" },
-                { key: "private", label: "Private charter" },
-              ].map((g) => {
-                const active = groupType === g.key;
-                return (
-                  <button
-                    key={g.key}
-                    onClick={() => setGroupType(g.key)}
-                    className="flex-1 py-2 rounded-full text-xs font-medium transition"
-                    style={{ background: active ? COLORS.teal : "transparent", color: active ? COLORS.ink : COLORS.paperDim }}
-                  >
-                    {g.label}
-                  </button>
-                );
-              })}
-            </div>
-          </label>
+          {!isPrivate && (
+            <label className="flex flex-col gap-1.5">
+              <span style={{ color: COLORS.paperDim, fontSize: 12, fontFamily: MONO }}>GROUP TYPE</span>
+              <div className="flex rounded-full p-1" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
+                {[
+                  { key: "shared", label: "Shared / walk-on" },
+                  { key: "private", label: "Private charter" },
+                ].map((g) => {
+                  const active = groupType === g.key;
+                  return (
+                    <button
+                      key={g.key}
+                      onClick={() => setGroupType(g.key)}
+                      className="flex-1 py-2 rounded-full text-xs font-medium transition"
+                      style={{ background: active ? COLORS.teal : "transparent", color: active ? COLORS.ink : COLORS.paperDim }}
+                    >
+                      {g.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </label>
+          )}
 
           <Field
             label="WHAT'S INCLUDED (comma separated)"
@@ -1563,8 +1746,8 @@ function PostCancellation({ onSave, onClose, initialValues }) {
             placeholder="e.g. Meet at the north dock, not the main one"
           />
 
-          <PrimaryButton disabled={!valid} onClick={() => onSave({ ...form, kind, groupType }, initialValues?.id)}>
-            {isEdit ? "Save changes" : kind === "cancellation" ? "Post to Last Cast" : "List this trip"}
+          <PrimaryButton disabled={!valid} onClick={() => onSave({ ...form, kind, groupType: isPrivate ? "private" : groupType }, initialValues?.id)}>
+            {isEdit ? "Save changes" : isPrivate ? "List charter" : kind === "cancellation" ? "Post to Last Cast" : "List this trip"}
           </PrimaryButton>
         </div>
       </div>
@@ -1576,7 +1759,7 @@ function PostCancellation({ onSave, onClose, initialValues }) {
    CAPTAIN: DASHBOARD
 --------------------------------------------------------------------- */
 function listingWhen(l) {
-  if (l.kind === "open" && l.date) return new Date(l.date).getTime();
+  if ((l.kind === "open" || l.kind === "private") && l.date) return new Date(l.date).getTime();
   if (l.kind === "cancellation" && l.hours != null) return Date.now() + l.hours * 3600000;
   return Infinity;
 }
@@ -1606,7 +1789,7 @@ function CaptainDashboard({ captain, joinIndex, onExit, onSettings }) {
     spots: Number(form.spots),
     price: Number(form.price),
     hours: form.kind === "cancellation" ? Number(form.hours) : null,
-    date: form.kind === "open" ? form.date : null,
+    date: (form.kind === "open" || form.kind === "private") ? form.date : null,
     meetingPoint: form.meetingPoint,
     groupType: form.groupType,
     included: form.included ? form.included.split(",").map((s) => s.trim()).filter(Boolean) : [],
@@ -1697,17 +1880,23 @@ function CaptainDashboard({ captain, joinIndex, onExit, onSettings }) {
                   <div>
                     <div className="flex items-center gap-1.5">
                       <span style={{ color: COLORS.paper, fontSize: 14, fontWeight: 500 }}>{l.species}</span>
-                      <Tag tone={l.kind === "open" ? "teal" : "rust"}>{l.kind === "open" ? "Open Trip" : "Cancellation"}</Tag>
+                      <Tag tone={l.kind === "open" ? "teal" : l.kind === "private" ? "gold" : "rust"}>
+                        {l.kind === "open" ? "Open Trip" : l.kind === "private" ? "Private Charter" : "Cancellation"}
+                      </Tag>
                     </div>
                     <div style={{ color: COLORS.paperDim, fontSize: 12, marginTop: 4 }}>
-                      {l.spots} seats · {l.kind === "open" ? `trip on ${l.date}` : `departs in ${l.hours}h`}
+                      {l.kind === "private"
+                        ? `up to ${l.spots} guests · trip on ${l.date}`
+                        : `${l.spots} seats · ${l.kind === "open" ? `trip on ${l.date}` : `departs in ${l.hours}h`}`}
                     </div>
                     {l.notes && (
                       <div style={{ color: COLORS.gold, fontSize: 11.5, marginTop: 4, fontStyle: "italic" }}>note: {l.notes}</div>
                     )}
                   </div>
                   <div className="text-right">
-                    <div style={{ color: COLORS.paper, fontFamily: MONO, fontSize: 14 }}>${l.price}/seat</div>
+                    <div style={{ color: COLORS.paper, fontFamily: MONO, fontSize: 14 }}>
+                      ${l.price}{l.kind === "private" ? " total" : "/seat"}
+                    </div>
                     <div style={{ color: COLORS.gold, fontSize: 11, marginTop: 2 }}>you net ${net}</div>
                   </div>
                 </div>
