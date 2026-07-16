@@ -46,6 +46,7 @@ const CHARTERS = [
     captain: "Capt. Mara Doyle",
     boat: "Silver Reel",
     location: "Destin, FL",
+    zip: "32541",
     meetingPoint: "Harborwalk Marina, Dock C",
     species: ["Snapper", "Grouper"],
     type: "Offshore",
@@ -74,6 +75,7 @@ const CHARTERS = [
     captain: "Capt. Ruben Ortiz",
     boat: "Tidewater",
     location: "Galveston, TX",
+    zip: "77550",
     meetingPoint: "Pelican Rush Landing",
     species: ["Redfish", "Trout"],
     type: "Inshore",
@@ -101,6 +103,7 @@ const CHARTERS = [
     captain: "Capt. Elin Sorensen",
     boat: "North Star",
     location: "Green Bay, WI",
+    zip: "54301",
     meetingPoint: "Bay Shore Public Launch",
     species: ["Walleye", "Perch"],
     type: "Lake",
@@ -129,6 +132,7 @@ const CHARTERS = [
     captain: "Capt. Joe Bellamy",
     boat: "Fly & Line",
     location: "Missoula, MT",
+    zip: "59801",
     meetingPoint: "Clark Fork River Access",
     species: ["Trout"],
     type: "Fly",
@@ -157,6 +161,7 @@ const STANDARD_CHARTERS = [
     captain: "Capt. Lena Osei",
     boat: "Blue Horizon",
     location: "Key West, FL",
+    zip: "33040",
     meetingPoint: "Garrison Bight Marina",
     species: ["Mahi", "Tuna"],
     type: "Offshore",
@@ -180,6 +185,7 @@ const STANDARD_CHARTERS = [
     captain: "Capt. Marcus Webb",
     boat: "Bayrunner",
     location: "Charleston, SC",
+    zip: "29401",
     meetingPoint: "Shem Creek Dock",
     species: ["Redfish", "Flounder"],
     type: "Inshore",
@@ -203,6 +209,7 @@ const STANDARD_CHARTERS = [
     captain: "Capt. Elin Sorensen",
     boat: "North Star",
     location: "Green Bay, WI",
+    zip: "54301",
     meetingPoint: "Bay Shore Public Launch",
     species: ["Walleye", "Perch"],
     type: "Lake",
@@ -232,6 +239,7 @@ const PRIVATE_CHARTERS = [
     captain: "Capt. Nico Fuentes",
     boat: "Deep Drop",
     location: "Fort Lauderdale, FL",
+    zip: "33301",
     meetingPoint: "Bahia Mar Marina",
     species: ["Swordfish"],
     type: "Offshore",
@@ -254,6 +262,7 @@ const PRIVATE_CHARTERS = [
     captain: "Capt. Renee Alvarez",
     boat: "Salt Life",
     location: "Islamorada, FL",
+    zip: "33036",
     meetingPoint: "Whale Harbor Marina",
     species: ["Sailfish", "Mahi"],
     type: "Offshore",
@@ -290,7 +299,9 @@ const CAPTAINS_JOINED_SO_FAR = 41;
 
 // Official Last Cast platform sponsors. A captain's fee discount only applies
 // if the sponsor they claim is listed here — add real sponsors as deals close.
-const SPONSORS = [];
+// Official Last Cast platform sponsors now live in shell state (see
+// LastCastApp's `sponsors`), managed from the Admin dashboard, so real
+// sponsor deals can be added without editing code.
 
 // Founding Angler program: first 2,000 accounts get a badge + early access to
 // new deals — no fee discount, so it costs nothing ongoing.
@@ -362,6 +373,12 @@ function initials(name) {
 
 function normalizeCaptainName(name) {
   return (name || "").replace(/^capt\.?\s*/i, "").trim().toLowerCase();
+}
+
+// Merges a charter's static sample reviews with any real reviews anglers
+// submit during this session (stored in shell state, keyed by charter id).
+function reviewsFor(charter, extraReviews) {
+  return [...(charter.reviews || []), ...((extraReviews && extraReviews[charter.id]) || [])];
 }
 
 const AVATAR_PALETTE = [COLORS.rust, COLORS.teal, COLORS.gold, "#5C7C8A", "#8A5C6F"];
@@ -846,6 +863,7 @@ function Home({ onSelect, onCaptainPortal, onAccount, angler }) {
   const [tab, setTab] = useState("deals"); // "deals" or "browse"
   const [category, setCategory] = useState("All");
   const [query, setQuery] = useState("");
+  const [nearMe, setNearMe] = useState(false);
 
   const source = tab === "deals" ? CHARTERS : tab === "browse" ? STANDARD_CHARTERS : PRIVATE_CHARTERS;
 
@@ -858,6 +876,13 @@ function Home({ onSelect, onCaptainPortal, onAccount, angler }) {
       return matchesCat && matchesQuery;
     });
   }, [source, category, query]);
+
+  const sortedFiltered = useMemo(() => {
+    if (!nearMe || !angler?.zip) return filtered;
+    return [...filtered].sort(
+      (a, b) => Math.abs(Number(a.zip) - Number(angler.zip)) - Math.abs(Number(b.zip) - Number(angler.zip))
+    );
+  }, [filtered, nearMe, angler?.zip]);
 
   const urgentDeals = [...filtered].sort((a, b) => a.departure - b.departure).slice(0, 3);
 
@@ -953,6 +978,20 @@ function Home({ onSelect, onCaptainPortal, onAccount, angler }) {
             );
           })}
         </div>
+
+        {angler?.zip && (
+          <button
+            onClick={() => setNearMe((v) => !v)}
+            className="mt-3 px-3.5 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5"
+            style={{
+              background: nearMe ? COLORS.teal : "transparent",
+              border: `1px solid ${nearMe ? COLORS.teal : COLORS.line}`,
+              color: nearMe ? COLORS.ink : COLORS.paperDim,
+            }}
+          >
+            📍 {nearMe ? "Sorted near you" : "Sort near me"}
+          </button>
+        )}
       </div>
 
       {tab === "deals" && (
@@ -1004,7 +1043,7 @@ function Home({ onSelect, onCaptainPortal, onAccount, angler }) {
           {tab === "deals" ? "All open seats" : tab === "browse" ? "Upcoming charters" : "Whole-boat charters"}
         </h2>
         <div className="flex flex-col gap-3">
-          {filtered.length === 0 && (
+          {sortedFiltered.length === 0 && (
             <div style={{ color: COLORS.paperDim, fontSize: 14 }}>
               {tab === "deals"
                 ? "No open seats match that search right now — try another spot or species."
@@ -1014,7 +1053,7 @@ function Home({ onSelect, onCaptainPortal, onAccount, angler }) {
             </div>
           )}
           {tab === "deals" &&
-            filtered.map((c) => (
+            sortedFiltered.map((c) => (
               <button
                 key={c.id}
                 onClick={() => onSelect(c)}
@@ -1048,8 +1087,8 @@ function Home({ onSelect, onCaptainPortal, onAccount, angler }) {
                 </div>
               </button>
             ))}
-          {tab === "browse" && filtered.map((c) => <BrowseListingCard key={c.id} c={c} onSelect={onSelect} />)}
-          {tab === "private" && filtered.map((c) => <PrivateCharterCard key={c.id} c={c} onSelect={onSelect} />)}
+          {tab === "browse" && sortedFiltered.map((c) => <BrowseListingCard key={c.id} c={c} onSelect={onSelect} />)}
+          {tab === "private" && sortedFiltered.map((c) => <PrivateCharterCard key={c.id} c={c} onSelect={onSelect} />)}
         </div>
       </div>
     </div>
@@ -1059,8 +1098,9 @@ function Home({ onSelect, onCaptainPortal, onAccount, angler }) {
 /* ---------------------------------------------------------------------
    CUSTOMER: DETAIL
 --------------------------------------------------------------------- */
-function Detail({ charter, onBack, onBook, onViewReviews }) {
-  const reviewCount = charter.reviews?.length || 0;
+function Detail({ charter, onBack, onBook, onViewReviews, extraReviews }) {
+  const allReviews = reviewsFor(charter, extraReviews);
+  const reviewCount = allReviews.length;
   return (
     <div style={{ background: COLORS.ink, minHeight: "100%" }}>
       <div className="h-56 relative" style={{ background: charter.img }}>
@@ -1203,7 +1243,7 @@ function Detail({ charter, onBack, onBook, onViewReviews }) {
               <button onClick={onViewReviews} style={{ color: COLORS.teal, fontSize: 12.5 }}>See all →</button>
             </div>
             <div className="flex flex-col gap-3">
-              {charter.reviews.slice(0, 2).map((r, i) => (
+              {allReviews.slice(0, 2).map((r, i) => (
                 <div key={i} className="rounded-2xl p-3.5" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
                   <div className="flex items-center justify-between">
                     <span style={{ color: COLORS.paper, fontSize: 13.5, fontWeight: 500 }}>{r.name}</span>
@@ -1254,8 +1294,8 @@ function Detail({ charter, onBack, onBook, onViewReviews }) {
 /* ---------------------------------------------------------------------
    CUSTOMER: CHARTER REVIEWS PAGE
 --------------------------------------------------------------------- */
-function CharterReviewsPage({ charter, replies, onBack }) {
-  const reviews = charter.reviews || [];
+function CharterReviewsPage({ charter, replies, extraReviews, onBack }) {
+  const reviews = reviewsFor(charter, extraReviews);
   return (
     <div className="px-6 pt-6 pb-14">
       <button onClick={onBack} style={{ color: COLORS.paperDim, fontSize: 14 }} className="mb-4">
@@ -1658,6 +1698,7 @@ function TripCard({ b, onOpen }) {
         <div className="flex items-center gap-1.5">
           <span style={{ color: COLORS.paper, fontSize: 14, fontWeight: 500 }}>{b.charter.boat}</span>
           {b.waitlist && <Tag tone="teal">Waitlisted</Tag>}
+          {b.status === "cancelled" && <Tag tone="rust">Cancelled</Tag>}
         </div>
         <div style={{ color: COLORS.paperDim, fontSize: 12, marginTop: 3 }}>
           {b.charter.captain} · {b.charter.location}
@@ -1674,6 +1715,7 @@ function TripCard({ b, onOpen }) {
 function AnglerAccount({ angler, bookings, onOpenTrip, onLogout, onBack, onSettings, onPhotoChange, onVerifyMilitary, onRemoveMilitary }) {
   const upcoming = bookings.filter((b) => b.status === "upcoming");
   const past = bookings.filter((b) => b.status === "past");
+  const cancelled = bookings.filter((b) => b.status === "cancelled");
 
   return (
     <div className="px-6 pt-6 pb-16">
@@ -1715,7 +1757,7 @@ function AnglerAccount({ angler, bookings, onOpenTrip, onLogout, onBack, onSetti
       </div>
 
       <h2 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 17, fontWeight: 600, marginBottom: 10 }}>Past trips</h2>
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2 mb-7">
         {past.length === 0 && (
           <p style={{ color: COLORS.paperDim, fontSize: 13 }}>Your completed trips will show up here.</p>
         )}
@@ -1723,6 +1765,17 @@ function AnglerAccount({ angler, bookings, onOpenTrip, onLogout, onBack, onSetti
           <TripCard key={b.id} b={b} onOpen={onOpenTrip} />
         ))}
       </div>
+
+      {cancelled.length > 0 && (
+        <>
+          <h2 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 17, fontWeight: 600, marginBottom: 10 }}>Cancelled</h2>
+          <div className="flex flex-col gap-2">
+            {cancelled.map((b) => (
+              <TripCard key={b.id} b={b} onOpen={onOpenTrip} />
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -1789,14 +1842,24 @@ function TripMessages({ booking, onBack, onSend }) {
   );
 }
 
-function TripDetail({ booking, onBack, onMessage }) {
+function TripDetail({ booking, onBack, onMessage, onCancel, onSubmitReview }) {
   const { charter, status } = booking;
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+  const [showReviewForm, setShowReviewForm] = useState(false);
+
+  const statusTone = status === "cancelled" ? "rust" : status === "upcoming" ? "gold" : "teal";
+  const statusLabel = status === "cancelled" ? "Cancelled" : status === "upcoming" ? "Upcoming" : "Completed";
+
   return (
     <div className="px-6 pt-6 pb-10">
       <button onClick={onBack} style={{ color: COLORS.paperDim, fontSize: 14 }} className="mb-4">
         ← Back to account
       </button>
-      <Tag tone={status === "upcoming" ? "gold" : "teal"}>{status === "upcoming" ? "Upcoming" : "Completed"}</Tag>
+      <div className="flex items-center gap-1.5">
+        <Tag tone={statusTone}>{statusLabel}</Tag>
+        {booking.waitlist && <Tag tone="teal">Waitlisted</Tag>}
+      </div>
       <h1 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 24, fontWeight: 600, marginTop: 8 }}>{charter.boat}</h1>
       <div style={{ color: COLORS.paperDim, fontSize: 14, marginTop: 2 }}>
         {charter.captain} · {charter.location}
@@ -1805,17 +1868,82 @@ function TripDetail({ booking, onBack, onMessage }) {
       <div className="mt-5 rounded-2xl p-4" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
         <Row label="Date" value={formatDate(charter.departure)} />
         <Row label="Meeting point" value={charter.meetingPoint || charter.location} />
-        <Row label="Seats booked" value={booking.spots} />
-        <Row label="Total paid" value={`$${charter.price * (booking.spots || 1)}`} />
+        <Row label={charter.saleType === "private" ? "Guests" : "Seats"} value={booking.spots} />
+        <Row
+          label="Total paid"
+          value={`$${charter.saleType === "private" ? charter.totalPrice : charter.price * (booking.spots || 1)}`}
+        />
       </div>
 
-      <button
-        onClick={() => onMessage(booking)}
-        className="w-full mt-5 py-3.5 rounded-full text-sm font-semibold flex items-center justify-center gap-2"
-        style={{ background: COLORS.teal, color: COLORS.ink }}
-      >
-        💬 Message {charter.captain.split(" ")[1] || "captain"}
-      </button>
+      {status !== "cancelled" && (
+        <button
+          onClick={() => onMessage(booking)}
+          className="w-full mt-5 py-3.5 rounded-full text-sm font-semibold flex items-center justify-center gap-2"
+          style={{ background: COLORS.teal, color: COLORS.ink }}
+        >
+          💬 Message {charter.captain.split(" ")[1] || "captain"}
+        </button>
+      )}
+
+      {status === "upcoming" && (
+        <button
+          onClick={() => {
+            if (window.confirm(booking.waitlist ? "Leave the waitlist for this trip?" : "Cancel this booking? This can't be undone.")) {
+              onCancel(booking.id);
+            }
+          }}
+          className="w-full mt-3 py-3 rounded-full text-sm font-medium"
+          style={{ border: `1px solid ${COLORS.rust}`, color: COLORS.rust }}
+        >
+          {booking.waitlist ? "Leave waitlist" : "Cancel booking"}
+        </button>
+      )}
+
+      {status === "past" && !booking.reviewed && (
+        <div className="mt-6 rounded-2xl p-4" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.gold}55` }}>
+          {!showReviewForm ? (
+            <>
+              <div style={{ color: COLORS.gold, fontSize: 13, fontWeight: 600 }}>How was the trip?</div>
+              <p style={{ color: COLORS.paperDim, fontSize: 12, marginTop: 4, lineHeight: 1.4 }}>
+                Leave a review for {charter.captain} — it'll show up on their reviews page.
+              </p>
+              <button
+                onClick={() => setShowReviewForm(true)}
+                className="mt-3 px-4 py-2 rounded-full text-xs font-semibold"
+                style={{ background: COLORS.gold, color: COLORS.ink }}
+              >
+                Leave a review
+              </button>
+            </>
+          ) : (
+            <>
+              <div style={{ color: COLORS.paperDim, fontSize: 11, fontFamily: MONO, marginBottom: 6 }}>YOUR RATING</div>
+              <div className="flex gap-1 mb-3">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button key={n} onClick={() => setReviewRating(n)} style={{ fontSize: 22, opacity: n <= reviewRating ? 1 : 0.3 }}>
+                    ★
+                  </button>
+                ))}
+              </div>
+              <Field
+                label="COMMENT"
+                value={reviewComment}
+                onChange={(e) => setReviewComment(e.target.value)}
+                placeholder="How'd the trip go?"
+              />
+              <PrimaryButton
+                disabled={!reviewComment.trim()}
+                onClick={() => onSubmitReview(booking, { rating: reviewRating, comment: reviewComment.trim() })}
+              >
+                Submit review
+              </PrimaryButton>
+            </>
+          )}
+        </div>
+      )}
+      {status === "past" && booking.reviewed && (
+        <p style={{ color: COLORS.teal, fontSize: 12.5, marginTop: 14, textAlign: "center" }}>✓ You reviewed this trip</p>
+      )}
     </div>
   );
 }
@@ -1883,24 +2011,39 @@ function CaptainLicense({ onNext, onBack }) {
         <span style={{ color: COLORS.paperDim, fontSize: 12 }}>PDF or photo, under 10MB</span>
       </div>
       <div className="mt-6">
-        <PrimaryButton disabled={!fileName} onClick={onNext}>Submit for review</PrimaryButton>
+        <PrimaryButton disabled={!fileName} onClick={() => onNext(fileName)}>Submit for review</PrimaryButton>
       </div>
     </div>
   );
 }
 
-function CaptainPending({ onApprove }) {
+function CaptainPending({ isApproved, onContinue }) {
   return (
     <div className="px-6 pt-16 pb-10 flex flex-col items-center text-center">
-      <div className="w-16 h-16 rounded-full flex items-center justify-center mb-5" style={{ background: `${COLORS.gold}22`, border: `1px solid ${COLORS.gold}` }}>
-        <span style={{ fontSize: 26 }}>⏳</span>
+      <div
+        className="w-16 h-16 rounded-full flex items-center justify-center mb-5"
+        style={{ background: isApproved ? `${COLORS.teal}22` : `${COLORS.gold}22`, border: `1px solid ${isApproved ? COLORS.teal : COLORS.gold}` }}
+      >
+        <span style={{ fontSize: 26 }}>{isApproved ? "✓" : "⏳"}</span>
       </div>
-      <h1 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 22, fontWeight: 600 }}>Application under review</h1>
+      <h1 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 22, fontWeight: 600 }}>
+        {isApproved ? "You're verified!" : "Application under review"}
+      </h1>
       <p style={{ color: COLORS.paperDim, fontSize: 14, marginTop: 8, lineHeight: 1.6, maxWidth: 320 }}>
-        We usually verify captains within 24 hours. You'll get an email the moment you're cleared to start posting seats.
+        {isApproved
+          ? "An admin reviewed your license and cleared you to start posting seats."
+          : "We usually verify captains within 24 hours. You'll get an email the moment you're cleared to start posting seats."}
       </p>
+      {!isApproved && (
+        <p style={{ color: COLORS.paperDim, fontSize: 11.5, marginTop: 10, opacity: 0.7, lineHeight: 1.4, maxWidth: 320 }}>
+          Testing this yourself? Open the admin panel in another tab (add <b>?admin=1</b> to the app's URL) and
+          approve this application there.
+        </p>
+      )}
       <div className="mt-8 w-full">
-        <PrimaryButton onClick={onApprove}>(Demo) Simulate approval →</PrimaryButton>
+        <PrimaryButton disabled={!isApproved} onClick={onContinue}>
+          {isApproved ? "Continue to dashboard →" : "Waiting for approval..."}
+        </PrimaryButton>
       </div>
     </div>
   );
@@ -1964,11 +2107,11 @@ function FoundingAnglerCard({ joinIndex }) {
   );
 }
 
-function SponsorClaim() {
-  const [selected, setSelected] = useState(SPONSORS[0]?.id || "");
+function SponsorClaim({ sponsors }) {
+  const [selected, setSelected] = useState(sponsors[0]?.id || "");
   const [proof, setProof] = useState("");
   const [submitted, setSubmitted] = useState(false);
-  const activeSponsor = SPONSORS.find((s) => s.id === selected);
+  const activeSponsor = sponsors.find((s) => s.id === selected);
 
   if (submitted) {
     return (
@@ -1994,7 +2137,7 @@ function SponsorClaim() {
           className="rounded-xl px-3 py-2.5 text-sm outline-none"
           style={{ background: COLORS.paper, color: COLORS.ink }}
         >
-          {SPONSORS.map((s) => (
+          {sponsors.map((s) => (
             <option key={s.id} value={s.id}>
               {s.name} — {s.discountPct}% off
             </option>
@@ -2184,7 +2327,7 @@ function listingWhen(l) {
   return Infinity;
 }
 
-function CaptainDashboard({ captain, joinIndex, bookings, onExit, onSettings, onPhotoChange, onOpenBooking, reviewReplies, onReplyReview, onVerifyMilitary, onRemoveMilitary }) {
+function CaptainDashboard({ captain, joinIndex, bookings, onExit, onSettings, onPhotoChange, onOpenBooking, reviewReplies, onReplyReview, onVerifyMilitary, onRemoveMilitary, sponsors, extraReviews }) {
   const [listings, setListings] = useState([
     { id: 1, kind: "cancellation", species: "Redfish, Trout", spots: 2, price: 90, hours: 3, notes: "" },
   ]);
@@ -2202,12 +2345,12 @@ function CaptainDashboard({ captain, joinIndex, bookings, onExit, onSettings, on
   const myReviews = useMemo(() => {
     const out = [];
     ALL_CHARTERS.filter((c) => normalizeCaptainName(c.captain) === normalizeCaptainName(captain.name)).forEach((charter) => {
-      (charter.reviews || []).forEach((review, idx) => {
+      reviewsFor(charter, extraReviews).forEach((review, idx) => {
         out.push({ key: `${charter.id}-${idx}`, charter, review });
       });
     });
     return out;
-  }, [captain.name]);
+  }, [captain.name, extraReviews]);
 
   const closeForm = () => {
     setShowPost(false);
@@ -2427,7 +2570,7 @@ function CaptainDashboard({ captain, joinIndex, bookings, onExit, onSettings, on
       <div className="mt-7 rounded-2xl p-4" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.teal}55` }}>
         <div style={{ color: COLORS.teal, fontSize: 12, fontFamily: MONO, letterSpacing: 0.5 }}>SPONSORED RATES</div>
 
-        {SPONSORS.length === 0 ? (
+        {sponsors.length === 0 ? (
           <>
             <p style={{ color: COLORS.paperDim, fontSize: 12.5, marginTop: 6, lineHeight: 1.5 }}>
               Last Cast doesn't have any official sponsors yet. Once a brand signs on as a platform sponsor, you'll
@@ -2442,7 +2585,7 @@ function CaptainDashboard({ captain, joinIndex, bookings, onExit, onSettings, on
             </button>
           </>
         ) : (
-          <SponsorClaim />
+          <SponsorClaim sponsors={sponsors} />
         )}
       </div>
 
@@ -2603,6 +2746,129 @@ function CaptainReviews({ myReviews, replies, onReply }) {
 }
 
 /* ---------------------------------------------------------------------
+   ADMIN: LOGIN + DASHBOARD (real captain approval, sponsors, platform stats)
+--------------------------------------------------------------------- */
+function AdminLogin({ onLogin }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const valid = email.includes("@") && password.length >= 4;
+  return (
+    <div className="px-6 pt-10 pb-10">
+      <BrandMark />
+      <div className="mt-6">
+        <Header eyebrow="ADMIN" title="Last Cast platform admin" sub="Approve captains, manage sponsors, and see how the platform's doing." />
+      </div>
+      <div className="flex flex-col gap-4">
+        <Field label="EMAIL" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@lastcast.app" />
+        <Field label="PASSWORD" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
+        <PrimaryButton disabled={!valid} onClick={onLogin}>Log in</PrimaryButton>
+        <p style={{ color: COLORS.paperDim, fontSize: 11, marginTop: 4, opacity: 0.7, lineHeight: 1.4 }}>
+          This login doesn't check anything real yet — same as the rest of the app until the backend exists. Anyone
+          who knows the ?admin=1 link can reach this screen for now.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function AdminDashboard({ pendingCaptains, onApproveCaptain, onRejectCaptain, sponsors, onAddSponsor, onRemoveSponsor, bookings }) {
+  const [sponsorName, setSponsorName] = useState("");
+  const [sponsorPct, setSponsorPct] = useState("10");
+
+  const totalBookings = bookings.filter((b) => !b.waitlist).length;
+  const totalWaitlist = bookings.filter((b) => b.waitlist).length;
+  const totalRevenue = bookings
+    .filter((b) => !b.waitlist)
+    .reduce((sum, b) => sum + (b.charter.saleType === "private" ? b.charter.totalPrice : b.charter.price * b.spots), 0);
+
+  return (
+    <div className="px-6 pt-8 pb-16">
+      <BrandMark />
+      <h1 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 22, fontWeight: 600, marginTop: 16 }}>Admin dashboard</h1>
+
+      <div className="grid grid-cols-3 gap-2 mt-4">
+        {[["Bookings", totalBookings], ["Waitlisted", totalWaitlist], ["Revenue", `$${totalRevenue.toLocaleString()}`]].map(([label, val]) => (
+          <div key={label} className="rounded-2xl p-3 text-center" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
+            <div style={{ color: COLORS.paper, fontFamily: MONO, fontSize: 16, fontWeight: 500 }}>{val}</div>
+            <div style={{ color: COLORS.paperDim, fontSize: 10.5, marginTop: 2 }}>{label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-7">
+        <h2 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 17, fontWeight: 600, marginBottom: 4 }}>
+          Pending captain applications
+        </h2>
+        <p style={{ color: COLORS.paperDim, fontSize: 11.5, marginBottom: 10, lineHeight: 1.4, opacity: 0.85 }}>
+          Review the license before approving — this is the actual gate that makes "verified captain" mean
+          something.
+        </p>
+        {pendingCaptains.length === 0 && (
+          <p style={{ color: COLORS.paperDim, fontSize: 13 }}>No applications waiting on you right now.</p>
+        )}
+        <div className="flex flex-col gap-2">
+          {pendingCaptains.map((app) => (
+            <div key={app.id} className="rounded-2xl p-3.5" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
+              <div style={{ color: COLORS.paper, fontSize: 14, fontWeight: 500 }}>{app.name}</div>
+              <div style={{ color: COLORS.paperDim, fontSize: 12, marginTop: 2 }}>
+                {app.boat} · {app.location} · {app.species}
+              </div>
+              <div style={{ color: COLORS.gold, fontSize: 11.5, marginTop: 4, fontFamily: MONO }}>📄 {app.licenseFileName}</div>
+              <div className="flex gap-2 mt-3 pt-3" style={{ borderTop: `1px solid ${COLORS.line}` }}>
+                <button
+                  onClick={() => onApproveCaptain(app.id)}
+                  className="flex-1 py-1.5 rounded-full text-xs font-semibold"
+                  style={{ background: COLORS.teal, color: COLORS.ink }}
+                >
+                  Approve
+                </button>
+                <button
+                  onClick={() => onRejectCaptain(app.id)}
+                  className="flex-1 py-1.5 rounded-full text-xs font-medium"
+                  style={{ border: `1px solid ${COLORS.rust}`, color: COLORS.rust }}
+                >
+                  Reject
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-7">
+        <h2 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 17, fontWeight: 600, marginBottom: 10 }}>Platform sponsors</h2>
+        <div className="flex flex-col gap-2 mb-4">
+          {sponsors.length === 0 && <p style={{ color: COLORS.paperDim, fontSize: 13 }}>No sponsors added yet.</p>}
+          {sponsors.map((s) => (
+            <div key={s.id} className="flex items-center justify-between rounded-xl px-3.5 py-2.5" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
+              <span style={{ color: COLORS.paper, fontSize: 13 }}>{s.name} — {s.discountPct}% off</span>
+              <button onClick={() => onRemoveSponsor(s.id)} style={{ color: COLORS.rust, fontSize: 12 }}>Remove</button>
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <div className="col-span-2">
+            <Field label="SPONSOR NAME" value={sponsorName} onChange={(e) => setSponsorName(e.target.value)} placeholder="Yeti Coolers" />
+          </div>
+          <Field label="DISCOUNT %" type="number" min="1" max="100" value={sponsorPct} onChange={(e) => setSponsorPct(e.target.value)} />
+        </div>
+        <button
+          disabled={!sponsorName.trim()}
+          onClick={() => {
+            onAddSponsor({ name: sponsorName.trim(), discountPct: Number(sponsorPct) });
+            setSponsorName("");
+          }}
+          className="w-full mt-3 py-2.5 rounded-full text-xs font-semibold"
+          style={{ background: sponsorName.trim() ? COLORS.gold : COLORS.line, color: COLORS.ink }}
+        >
+          + Add sponsor
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------
    APP SHELL — unifies customer app + captain portal with shared nav
 --------------------------------------------------------------------- */
 function wantsCaptainEntry() {
@@ -2610,11 +2876,21 @@ function wantsCaptainEntry() {
   const params = new URLSearchParams(window.location.search);
   return params.get("captain") === "1" || window.location.hash === "#captain";
 }
+function wantsAdminEntry() {
+  if (typeof window === "undefined") return false;
+  const params = new URLSearchParams(window.location.search);
+  return params.get("admin") === "1" || window.location.hash === "#admin";
+}
 
 export default function LastCastApp() {
-  // "customer" or "captain" side of the app — a direct link (?captain=1 or #captain)
-  // drops straight into the captain portal, e.g. for texting/QR-coding to captains
-  const [side, setSide] = useState(() => (wantsCaptainEntry() ? "captain" : "customer"));
+  // "customer", "captain", or "admin" side of the app — direct links
+  // (?captain=1 / ?admin=1) drop straight into that portal
+  const [side, setSide] = useState(() => {
+    if (wantsAdminEntry()) return "admin";
+    if (wantsCaptainEntry()) return "captain";
+    return "customer";
+  });
+  const [adminLoggedIn, setAdminLoggedIn] = useState(false);
 
   // customer-side view state
   const [customerView, setCustomerView] = useState("home");
@@ -2651,6 +2927,12 @@ export default function LastCastApp() {
   const [reviewReplies, setReviewReplies] = useState({});
   const [activeCaptainBookingId, setActiveCaptainBookingId] = useState(null);
   const activeCaptainBooking = anglerBookings.find((b) => b.id === activeCaptainBookingId) || null;
+
+  // real admin-approval queue for captain applications, real sponsor list,
+  // and real angler-submitted reviews — all shared across sides in this session
+  const [pendingCaptains, setPendingCaptains] = useState([]);
+  const [sponsors, setSponsors] = useState([]);
+  const [extraReviews, setExtraReviews] = useState({});
 
   const goCaptainPortal = () => {
     setSide("captain");
@@ -2708,10 +2990,11 @@ export default function LastCastApp() {
                 onBack={() => setCustomerView("home")}
                 onBook={() => setCustomerView("booking")}
                 onViewReviews={() => setCustomerView("charterReviews")}
+                extraReviews={extraReviews}
               />
             )}
             {customerView === "charterReviews" && charter && (
-              <CharterReviewsPage charter={charter} replies={reviewReplies} onBack={() => setCustomerView("detail")} />
+              <CharterReviewsPage charter={charter} replies={reviewReplies} extraReviews={extraReviews} onBack={() => setCustomerView("detail")} />
             )}
             {customerView === "booking" && charter && (
               <Booking
@@ -2821,6 +3104,16 @@ export default function LastCastApp() {
                 booking={activeTrip}
                 onBack={() => setCustomerView("account")}
                 onMessage={() => setCustomerView("tripMessages")}
+                onCancel={(bookingId) => {
+                  setAnglerBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status: "cancelled" } : b)));
+                }}
+                onSubmitReview={(booking, { rating, comment }) => {
+                  setExtraReviews((prev) => ({
+                    ...prev,
+                    [booking.charter.id]: [...(prev[booking.charter.id] || []), { name: angler?.name || booking.name, rating, comment }],
+                  }));
+                  setAnglerBookings((prev) => prev.map((b) => (b.id === booking.id ? { ...b, reviewed: true } : b)));
+                }}
               />
             )}
             {customerView === "tripMessages" && activeTrip && (
@@ -2859,9 +3152,22 @@ export default function LastCastApp() {
               />
             )}
             {captainView === "license" && (
-              <CaptainLicense onBack={() => setCaptainView("register")} onNext={() => setCaptainView("pending")} />
+              <CaptainLicense
+                onBack={() => setCaptainView("register")}
+                onNext={(licenseFileName) => {
+                  const id = `app-${Date.now()}`;
+                  setCaptain((prev) => ({ ...prev, id, licenseFileName }));
+                  setPendingCaptains((prev) => [...prev, { ...captain, id, licenseFileName }]);
+                  setCaptainView("pending");
+                }}
+              />
             )}
-            {captainView === "pending" && <CaptainPending onApprove={() => setCaptainView("dashboard")} />}
+            {captainView === "pending" && (
+              <CaptainPending
+                isApproved={captain.id ? !pendingCaptains.some((a) => a.id === captain.id) : false}
+                onContinue={() => setCaptainView("dashboard")}
+              />
+            )}
             {captainView === "dashboard" && (
               <CaptainDashboard
                 captain={captain}
@@ -2878,6 +3184,8 @@ export default function LastCastApp() {
                 }}
                 onVerifyMilitary={(status) => setCaptain({ ...captain, militaryStatus: status })}
                 onRemoveMilitary={() => setCaptain({ ...captain, militaryStatus: null })}
+                sponsors={sponsors}
+                extraReviews={extraReviews}
               />
             )}
             {captainView === "bookingDetail" && activeCaptainBooking && (
@@ -2903,6 +3211,24 @@ export default function LastCastApp() {
                   setCaptainView("login");
                 }}
                 deleteLabel="Delete captain account"
+              />
+            )}
+          </>
+        )}
+
+        {side === "admin" && (
+          <>
+            {!adminLoggedIn ? (
+              <AdminLogin onLogin={() => setAdminLoggedIn(true)} />
+            ) : (
+              <AdminDashboard
+                pendingCaptains={pendingCaptains}
+                onApproveCaptain={(id) => setPendingCaptains((prev) => prev.filter((a) => a.id !== id))}
+                onRejectCaptain={(id) => setPendingCaptains((prev) => prev.filter((a) => a.id !== id))}
+                sponsors={sponsors}
+                onAddSponsor={(s) => setSponsors((prev) => [...prev, { ...s, id: `sp-${Date.now()}` }])}
+                onRemoveSponsor={(id) => setSponsors((prev) => prev.filter((s) => s.id !== id))}
+                bookings={anglerBookings}
               />
             )}
           </>
