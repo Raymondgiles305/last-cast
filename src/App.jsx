@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 
 /* ---------------------------------------------------------------------
    SHARED DESIGN TOKENS
@@ -459,10 +459,47 @@ function Toggle({ checked, onChange }) {
   );
 }
 
+function AvatarUpload({ photoUrl, onChange, fallback, size = 88 }) {
+  const inputRef = useRef(null);
+  const handleFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => onChange(reader.result);
+    reader.readAsDataURL(file);
+  };
+  return (
+    <div className="flex items-center gap-4">
+      <div
+        onClick={() => inputRef.current?.click()}
+        className="rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer relative overflow-hidden"
+        style={{ width: size, height: size, background: COLORS.inkSoft, border: `1.5px dashed ${COLORS.line}` }}
+      >
+        {photoUrl ? (
+          <img src={photoUrl} alt="Profile" className="w-full h-full object-cover" />
+        ) : (
+          <span style={{ fontSize: size * 0.4 }}>{fallback}</span>
+        )}
+      </div>
+      <div>
+        <button
+          onClick={() => inputRef.current?.click()}
+          className="px-3.5 py-2 rounded-full text-xs font-semibold"
+          style={{ background: COLORS.teal, color: COLORS.ink }}
+        >
+          {photoUrl ? "Change photo" : "Upload photo"}
+        </button>
+        <p style={{ color: COLORS.paperDim, fontSize: 11, marginTop: 6, lineHeight: 1.4 }}>JPG or PNG, saved on this device.</p>
+      </div>
+      <input ref={inputRef} type="file" accept="image/*" onChange={handleFile} className="hidden" />
+    </div>
+  );
+}
+
 /* ---------------------------------------------------------------------
    SHARED: SETTINGS (used by both anglers and captains)
 --------------------------------------------------------------------- */
-function SettingsScreen({ title, fields, onSave, onLogout, onBack, onDeleteAccount, deleteLabel, showLicense, licenseFileName, onUploadLicense }) {
+function SettingsScreen({ title, fields, onSave, onLogout, onBack, onDeleteAccount, deleteLabel, showLicense, licenseFileName, onUploadLicense, photoUrl, onPhotoChange, photoFallback }) {
   const [tab, setTab] = useState("profile"); // "profile" or "privacy"
   const [values, setValues] = useState(() => Object.fromEntries(fields.map((f) => [f.key, f.value || ""])));
   const [saved, setSaved] = useState(false);
@@ -510,6 +547,7 @@ function SettingsScreen({ title, fields, onSave, onLogout, onBack, onDeleteAccou
 
       {tab === "profile" && (
         <div className="flex flex-col gap-4">
+          <AvatarUpload photoUrl={photoUrl} onChange={onPhotoChange} fallback={photoFallback} />
           {fields.map((f) => (
             <Field key={f.key} label={f.label} value={values[f.key]} onChange={set(f.key)} />
           ))}
@@ -700,7 +738,14 @@ function Home({ onSelect, onCaptainPortal, onAccount, angler }) {
               className="px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5"
               style={{ border: `1px solid ${COLORS.line}`, color: COLORS.paperDim }}
             >
-              {angler ? `${angler.joinIndex <= ANGLER_FOUNDING_CAP ? "⭐ " : "👤 "}${angler.name.split(" ")[0]}` : "👤 Account"}
+              {angler?.photoUrl ? (
+                <img src={angler.photoUrl} alt="" className="w-4 h-4 rounded-full object-cover" />
+              ) : angler ? (
+                <span>{angler.joinIndex <= ANGLER_FOUNDING_CAP ? "⭐" : "👤"}</span>
+              ) : (
+                <span>👤</span>
+              )}
+              {angler ? angler.name.split(" ")[0] : "Account"}
             </button>
             <button
               onClick={onCaptainPortal}
@@ -1440,8 +1485,8 @@ function AnglerAccount({ angler, bookings, onOpenTrip, onLogout, onBack, onSetti
           <h1 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 22, fontWeight: 600, marginTop: 2 }}>{angler.name}</h1>
           <div style={{ color: COLORS.paperDim, fontSize: 13, marginTop: 1 }}>{angler.email}</div>
         </div>
-        <div className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: COLORS.rust }}>
-          <span>👤</span>
+        <div className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden" style={{ background: COLORS.rust }}>
+          {angler.photoUrl ? <img src={angler.photoUrl} alt="" className="w-full h-full object-cover" /> : <span>👤</span>}
         </div>
       </div>
 
@@ -1981,8 +2026,8 @@ function CaptainDashboard({ captain, joinIndex, onExit, onSettings }) {
             {captain.boat} · {captain.location}
           </div>
         </div>
-        <div className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: COLORS.teal }}>
-          <span>⚓</span>
+        <div className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden" style={{ background: COLORS.teal }}>
+          {captain.photoUrl ? <img src={captain.photoUrl} alt="" className="w-full h-full object-cover" /> : <span>⚓</span>}
         </div>
       </div>
 
@@ -2345,6 +2390,9 @@ export default function LastCastApp() {
                 showLicense
                 licenseFileName={angler.licenseFileName}
                 onUploadLicense={(fileName) => setAngler({ ...angler, licenseFileName: fileName })}
+                photoUrl={angler.photoUrl}
+                photoFallback="👤"
+                onPhotoChange={(dataUrl) => setAngler({ ...angler, photoUrl: dataUrl })}
               />
             )}
             {customerView === "tripDetail" && activeTrip && (
@@ -2421,6 +2469,9 @@ export default function LastCastApp() {
                   setCaptainView("login");
                 }}
                 deleteLabel="Delete captain account"
+                photoUrl={captain.photoUrl}
+                photoFallback="⚓"
+                onPhotoChange={(dataUrl) => setCaptain({ ...captain, photoUrl: dataUrl })}
               />
             )}
           </>
