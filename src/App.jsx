@@ -545,6 +545,92 @@ function AvatarUpload({ photoUrl, onChange, fallback, size = 88 }) {
   );
 }
 
+// Simulated ID.me verification. A real integration redirects to ID.me's own
+// OAuth flow and requires a backend to receive and store the verified
+// credential — that doesn't exist yet, so this mimics the outcome (picking a
+// status, confirming) without a real identity check behind it.
+function VeteranVerification({ status, onVerify, onRemove }) {
+  const [picking, setPicking] = useState(false);
+  const [choice, setChoice] = useState("veteran");
+
+  if (status) {
+    const label = { active: "Active Duty", reserve: "Reserve", veteran: "Veteran" }[status];
+    return (
+      <div className="rounded-2xl p-4" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.gold}55` }}>
+        <div className="flex items-center justify-between">
+          <span style={{ color: COLORS.gold, fontSize: 12, fontFamily: MONO, letterSpacing: 0.5 }}>✓ VERIFIED · {label.toUpperCase()}</span>
+          <button onClick={onRemove} style={{ color: COLORS.paperDim, fontSize: 11.5 }}>Remove</button>
+        </div>
+        <p style={{ color: COLORS.paperDim, fontSize: 12, marginTop: 6, lineHeight: 1.4 }}>Verified with ID.me.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl p-4" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
+      <div style={{ color: COLORS.paperDim, fontSize: 12, fontFamily: MONO, letterSpacing: 0.5 }}>MILITARY VERIFICATION</div>
+      <p style={{ color: COLORS.paperDim, fontSize: 12, marginTop: 6, lineHeight: 1.4 }}>
+        Verify with ID.me as active duty, reserve, or a veteran to get a "Thank you for your service" badge on your
+        home screen.
+      </p>
+
+      {!picking ? (
+        <button
+          onClick={() => setPicking(true)}
+          className="mt-3 px-4 py-2 rounded-full text-xs font-semibold"
+          style={{ background: COLORS.gold, color: COLORS.ink }}
+        >
+          Verify with ID.me
+        </button>
+      ) : (
+        <div className="mt-3">
+          <div className="flex rounded-full p-1 mb-3" style={{ background: COLORS.ink, border: `1px solid ${COLORS.line}` }}>
+            {[
+              { key: "active", label: "Active Duty" },
+              { key: "reserve", label: "Reserve" },
+              { key: "veteran", label: "Veteran" },
+            ].map((o) => {
+              const active = choice === o.key;
+              return (
+                <button
+                  key={o.key}
+                  onClick={() => setChoice(o.key)}
+                  className="flex-1 py-2 rounded-full text-xs font-medium transition"
+                  style={{ background: active ? COLORS.gold : "transparent", color: active ? COLORS.ink : COLORS.paperDim }}
+                >
+                  {o.label}
+                </button>
+              );
+            })}
+          </div>
+          <p style={{ color: COLORS.paperDim, fontSize: 11, marginBottom: 8, opacity: 0.75, lineHeight: 1.4 }}>
+            Simulated for this prototype — a real integration hands off to ID.me's own verification flow.
+          </p>
+          <button
+            onClick={() => onVerify(choice)}
+            className="w-full py-2.5 rounded-full text-xs font-semibold"
+            style={{ background: COLORS.gold, color: COLORS.ink }}
+          >
+            Confirm verification
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ServiceBanner() {
+  return (
+    <div
+      className="rounded-2xl px-4 py-3 flex items-center gap-2.5 mb-5"
+      style={{ background: `${COLORS.gold}18`, border: `1px solid ${COLORS.gold}55` }}
+    >
+      <span style={{ fontSize: 18 }}>🎖️</span>
+      <span style={{ color: COLORS.gold, fontSize: 13, fontWeight: 600 }}>Thank you for your service.</span>
+    </div>
+  );
+}
+
 /* ---------------------------------------------------------------------
    SHARED: SETTINGS (used by both anglers and captains)
 --------------------------------------------------------------------- */
@@ -804,6 +890,8 @@ function Home({ onSelect, onCaptainPortal, onAccount, angler }) {
             </button>
           </div>
         </div>
+
+        {angler?.militaryStatus && <ServiceBanner />}
 
         <h1 style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 38, lineHeight: 1.05, color: COLORS.paper, letterSpacing: -0.5 }}>
           Somebody's seat
@@ -1583,7 +1671,7 @@ function TripCard({ b, onOpen }) {
   );
 }
 
-function AnglerAccount({ angler, bookings, onOpenTrip, onLogout, onBack, onSettings, onPhotoChange }) {
+function AnglerAccount({ angler, bookings, onOpenTrip, onLogout, onBack, onSettings, onPhotoChange, onVerifyMilitary, onRemoveMilitary }) {
   const upcoming = bookings.filter((b) => b.status === "upcoming");
   const past = bookings.filter((b) => b.status === "past");
 
@@ -1602,10 +1690,16 @@ function AnglerAccount({ angler, bookings, onOpenTrip, onLogout, onBack, onSetti
         <AvatarUpload photoUrl={angler.photoUrl} onChange={onPhotoChange} fallback="👤" size={80} />
       </div>
 
+      {angler.militaryStatus && <ServiceBanner />}
+
       <div className="mb-7">
         <div style={{ color: COLORS.paperDim, fontSize: 12, fontFamily: MONO }}>YOUR ACCOUNT</div>
         <h1 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 22, fontWeight: 600, marginTop: 2 }}>{angler.name}</h1>
         <div style={{ color: COLORS.paperDim, fontSize: 13, marginTop: 1 }}>{angler.email}</div>
+      </div>
+
+      <div className="mb-6">
+        <VeteranVerification status={angler.militaryStatus} onVerify={onVerifyMilitary} onRemove={onRemoveMilitary} />
       </div>
 
       {angler.joinIndex && <FoundingAnglerCard joinIndex={angler.joinIndex} />}
@@ -2090,7 +2184,7 @@ function listingWhen(l) {
   return Infinity;
 }
 
-function CaptainDashboard({ captain, joinIndex, bookings, onExit, onSettings, onPhotoChange, onOpenBooking, reviewReplies, onReplyReview }) {
+function CaptainDashboard({ captain, joinIndex, bookings, onExit, onSettings, onPhotoChange, onOpenBooking, reviewReplies, onReplyReview, onVerifyMilitary, onRemoveMilitary }) {
   const [listings, setListings] = useState([
     { id: 1, kind: "cancellation", species: "Redfish, Trout", spots: 2, price: 90, hours: 3, notes: "" },
   ]);
@@ -2153,12 +2247,18 @@ function CaptainDashboard({ captain, joinIndex, bookings, onExit, onSettings, on
         <AvatarUpload photoUrl={captain.photoUrl} onChange={onPhotoChange} fallback="⚓" size={80} />
       </div>
 
+      {captain.militaryStatus && <ServiceBanner />}
+
       <div className="mb-6">
         <div style={{ color: COLORS.paperDim, fontSize: 12, fontFamily: MONO }}>WELCOME BACK</div>
         <h1 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 22, fontWeight: 600, marginTop: 2 }}>{captain.name || "Captain"}</h1>
         <div style={{ color: COLORS.paperDim, fontSize: 13, marginTop: 1 }}>
           {captain.boat} · {captain.location}
         </div>
+      </div>
+
+      <div className="mb-6">
+        <VeteranVerification status={captain.militaryStatus} onVerify={onVerifyMilitary} onRemove={onRemoveMilitary} />
       </div>
 
       <FeeTierCard joinIndex={joinIndex} />
@@ -2684,6 +2784,8 @@ export default function LastCastApp() {
                 }}
                 onSettings={() => setCustomerView("anglerSettings")}
                 onPhotoChange={(dataUrl) => setAngler({ ...angler, photoUrl: dataUrl })}
+                onVerifyMilitary={(status) => setAngler({ ...angler, militaryStatus: status })}
+                onRemoveMilitary={() => setAngler({ ...angler, militaryStatus: null })}
               />
             )}
             {customerView === "anglerSettings" && angler && (
@@ -2774,6 +2876,8 @@ export default function LastCastApp() {
                   setActiveCaptainBookingId(b.id);
                   setCaptainView("bookingDetail");
                 }}
+                onVerifyMilitary={(status) => setCaptain({ ...captain, militaryStatus: status })}
+                onRemoveMilitary={() => setCaptain({ ...captain, militaryStatus: null })}
               />
             )}
             {captainView === "bookingDetail" && activeCaptainBooking && (
