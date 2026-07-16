@@ -462,15 +462,25 @@ function Toggle({ checked, onChange }) {
 /* ---------------------------------------------------------------------
    SHARED: SETTINGS (used by both anglers and captains)
 --------------------------------------------------------------------- */
-function SettingsScreen({ title, fields, onSave, onLogout, onBack, onDeleteAccount, deleteLabel, showLicense, licenseFileName, onUploadLicense }) {
+function SettingsScreen({ title, fields, onSave, onLogout, onBack, onDeleteAccount, deleteLabel }) {
+  const [tab, setTab] = useState("profile"); // "profile" or "privacy"
   const [values, setValues] = useState(() => Object.fromEntries(fields.map((f) => [f.key, f.value || ""])));
-  const [emailUpdates, setEmailUpdates] = useState(true);
-  const [smsAlerts, setSmsAlerts] = useState(true);
   const [saved, setSaved] = useState(false);
   const set = (k) => (e) => {
     setValues({ ...values, [k]: e.target.value });
     setSaved(false);
   };
+
+  const [pw, setPw] = useState({ current: "", next: "", confirm: "" });
+  const [pwSaved, setPwSaved] = useState(false);
+  const setPwField = (k) => (e) => {
+    setPw({ ...pw, [k]: e.target.value });
+    setPwSaved(false);
+  };
+  const pwValid = pw.current.length >= 4 && pw.next.length >= 4 && pw.next === pw.confirm;
+
+  const [emailUpdates, setEmailUpdates] = useState(true);
+  const [smsAlerts, setSmsAlerts] = useState(true);
 
   return (
     <div className="px-6 pt-6 pb-14">
@@ -479,79 +489,90 @@ function SettingsScreen({ title, fields, onSave, onLogout, onBack, onDeleteAccou
       </button>
       <Header title={title} />
 
-      <h3 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 15, fontWeight: 600, marginBottom: 10 }}>Profile</h3>
-      <div className="flex flex-col gap-4 mb-7">
-        {fields.map((f) => (
-          <Field key={f.key} label={f.label} value={values[f.key]} onChange={set(f.key)} />
-        ))}
-        <PrimaryButton
-          onClick={() => {
-            onSave(values);
-            setSaved(true);
-          }}
-        >
-          {saved ? "Saved ✓" : "Save changes"}
-        </PrimaryButton>
+      <div className="flex mb-6 rounded-full p-1" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
+        {[
+          { key: "profile", label: "Profile" },
+          { key: "privacy", label: "Privacy" },
+        ].map((t) => {
+          const active = tab === t.key;
+          return (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className="flex-1 py-2 rounded-full text-sm font-medium transition"
+              style={{ background: active ? COLORS.rust : "transparent", color: active ? COLORS.paper : COLORS.paperDim }}
+            >
+              {t.label}
+            </button>
+          );
+        })}
       </div>
 
-      {showLicense && (
-        <>
-          <h3 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Fishing license</h3>
-          <p style={{ color: COLORS.paperDim, fontSize: 11.5, marginBottom: 10, lineHeight: 1.4 }}>
-            Optional — only needed where the charter's license note says you'll need your own. Have it on file so
-            there's nothing to dig up at the dock.
-          </p>
-          <div className="mb-7">
-            <div
-              className="rounded-2xl p-5 flex flex-col items-center justify-center text-center gap-2 cursor-pointer"
-              style={{ background: COLORS.inkSoft, border: `1.5px dashed ${COLORS.line}` }}
-              onClick={() => onUploadLicense("fishing_license_scan.pdf")}
-            >
-              <span style={{ fontSize: 20 }}>📄</span>
-              <span style={{ color: COLORS.paper, fontSize: 13.5, fontWeight: 500 }}>
-                {licenseFileName ? licenseFileName : "Tap to upload your license"}
-              </span>
-              <span style={{ color: COLORS.paperDim, fontSize: 11.5 }}>PDF or photo, under 10MB</span>
-              {licenseFileName && <span style={{ color: COLORS.teal, fontSize: 11.5, marginTop: 2 }}>✓ On file</span>}
-            </div>
-          </div>
-        </>
+      {tab === "profile" && (
+        <div className="flex flex-col gap-4">
+          {fields.map((f) => (
+            <Field key={f.key} label={f.label} value={values[f.key]} onChange={set(f.key)} />
+          ))}
+          <PrimaryButton
+            onClick={() => {
+              onSave(values);
+              setSaved(true);
+            }}
+          >
+            {saved ? "Saved ✓" : "Save changes"}
+          </PrimaryButton>
+        </div>
       )}
 
-      <h3 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 15, fontWeight: 600, marginBottom: 10 }}>Notifications</h3>
-      <div className="flex flex-col gap-3 mb-7">
-        <div className="flex items-center justify-between rounded-2xl p-3.5" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
-          <div>
-            <div style={{ color: COLORS.paper, fontSize: 13.5 }}>Email updates</div>
-            <div style={{ color: COLORS.paperDim, fontSize: 11.5, marginTop: 1 }}>Booking confirmations and receipts</div>
+      {tab === "privacy" && (
+        <div>
+          <h3 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 15, fontWeight: 600, marginBottom: 10 }}>Change password</h3>
+          <div className="flex flex-col gap-4 mb-7">
+            <Field label="CURRENT PASSWORD" type="password" value={pw.current} onChange={setPwField("current")} placeholder="••••••••" />
+            <Field label="NEW PASSWORD" type="password" value={pw.next} onChange={setPwField("next")} placeholder="••••••••" />
+            <Field label="CONFIRM NEW PASSWORD" type="password" value={pw.confirm} onChange={setPwField("confirm")} placeholder="••••••••" />
+            <PrimaryButton disabled={!pwValid} onClick={() => setPwSaved(true)}>
+              {pwSaved ? "Password updated ✓" : "Update password"}
+            </PrimaryButton>
           </div>
-          <Toggle checked={emailUpdates} onChange={setEmailUpdates} />
-        </div>
-        <div className="flex items-center justify-between rounded-2xl p-3.5" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
-          <div>
-            <div style={{ color: COLORS.paper, fontSize: 13.5 }}>Text alerts</div>
-            <div style={{ color: COLORS.paperDim, fontSize: 11.5, marginTop: 1 }}>Last-minute deals and booking activity</div>
-          </div>
-          <Toggle checked={smsAlerts} onChange={setSmsAlerts} />
-        </div>
-        <p style={{ color: COLORS.paperDim, fontSize: 11, opacity: 0.7, lineHeight: 1.4 }}>
-          These preferences are saved on this device only — real delivery goes live once the backend is connected.
-        </p>
-      </div>
 
-      <button onClick={onLogout} className="w-full py-3 rounded-full text-sm font-medium mb-3" style={{ border: `1px solid ${COLORS.line}`, color: COLORS.paperDim }}>
-        Log out
-      </button>
-      {onDeleteAccount && (
-        <button
-          onClick={() => {
-            if (window.confirm("Delete your account? This can't be undone.")) onDeleteAccount();
-          }}
-          className="w-full py-3 rounded-full text-sm font-medium"
-          style={{ border: `1px solid ${COLORS.rust}`, color: COLORS.rust }}
-        >
-          {deleteLabel || "Delete account"}
-        </button>
+          <h3 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 15, fontWeight: 600, marginBottom: 10 }}>Notifications</h3>
+          <div className="flex flex-col gap-3 mb-7">
+            <div className="flex items-center justify-between rounded-2xl p-3.5" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
+              <div>
+                <div style={{ color: COLORS.paper, fontSize: 13.5 }}>Email updates</div>
+                <div style={{ color: COLORS.paperDim, fontSize: 11.5, marginTop: 1 }}>Booking confirmations and receipts</div>
+              </div>
+              <Toggle checked={emailUpdates} onChange={setEmailUpdates} />
+            </div>
+            <div className="flex items-center justify-between rounded-2xl p-3.5" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
+              <div>
+                <div style={{ color: COLORS.paper, fontSize: 13.5 }}>Text alerts</div>
+                <div style={{ color: COLORS.paperDim, fontSize: 11.5, marginTop: 1 }}>Last-minute deals and booking activity</div>
+              </div>
+              <Toggle checked={smsAlerts} onChange={setSmsAlerts} />
+            </div>
+            <p style={{ color: COLORS.paperDim, fontSize: 11, opacity: 0.7, lineHeight: 1.4 }}>
+              Password changes and preferences are saved on this device only — real security and delivery go live
+              once the backend is connected.
+            </p>
+          </div>
+
+          <button onClick={onLogout} className="w-full py-3 rounded-full text-sm font-medium mb-3" style={{ border: `1px solid ${COLORS.line}`, color: COLORS.paperDim }}>
+            Log out
+          </button>
+          {onDeleteAccount && (
+            <button
+              onClick={() => {
+                if (window.confirm("Delete your account? This can't be undone.")) onDeleteAccount();
+              }}
+              className="w-full py-3 rounded-full text-sm font-medium"
+              style={{ border: `1px solid ${COLORS.rust}`, color: COLORS.rust }}
+            >
+              {deleteLabel || "Delete account"}
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
