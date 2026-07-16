@@ -544,7 +544,7 @@ function AvatarUpload({ photoUrl, onChange, fallback, size = 88 }) {
 /* ---------------------------------------------------------------------
    SHARED: SETTINGS (used by both anglers and captains)
 --------------------------------------------------------------------- */
-function SettingsScreen({ title, fields, onSave, onLogout, onBack, onDeleteAccount, deleteLabel, showLicense, licenseFileName, onUploadLicense, photoUrl, onPhotoChange, photoFallback }) {
+function SettingsScreen({ title, fields, onSave, onLogout, onBack, onDeleteAccount, deleteLabel, showLicense, licenseFileName, onUploadLicense }) {
   const [tab, setTab] = useState("profile"); // "profile" or "privacy"
   const [values, setValues] = useState(() => Object.fromEntries(fields.map((f) => [f.key, f.value || ""])));
   const [saved, setSaved] = useState(false);
@@ -592,7 +592,6 @@ function SettingsScreen({ title, fields, onSave, onLogout, onBack, onDeleteAccou
 
       {tab === "profile" && (
         <div className="flex flex-col gap-4">
-          <AvatarUpload photoUrl={photoUrl} onChange={onPhotoChange} fallback={photoFallback} />
           {fields.map((f) => (
             <Field key={f.key} label={f.label} value={values[f.key]} onChange={set(f.key)} />
           ))}
@@ -1519,7 +1518,7 @@ function TripCard({ b, onOpen }) {
   );
 }
 
-function AnglerAccount({ angler, bookings, onOpenTrip, onLogout, onBack, onSettings }) {
+function AnglerAccount({ angler, bookings, onOpenTrip, onLogout, onBack, onSettings, onPhotoChange }) {
   const upcoming = bookings.filter((b) => b.status === "upcoming");
   const past = bookings.filter((b) => b.status === "past");
 
@@ -1534,15 +1533,14 @@ function AnglerAccount({ angler, bookings, onOpenTrip, onLogout, onBack, onSetti
         </button>
       </div>
 
-      <div className="flex items-center justify-between mb-7">
-        <div>
-          <div style={{ color: COLORS.paperDim, fontSize: 12, fontFamily: MONO }}>YOUR ACCOUNT</div>
-          <h1 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 22, fontWeight: 600, marginTop: 2 }}>{angler.name}</h1>
-          <div style={{ color: COLORS.paperDim, fontSize: 13, marginTop: 1 }}>{angler.email}</div>
-        </div>
-        <div className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden" style={{ background: COLORS.rust }}>
-          {angler.photoUrl ? <img src={angler.photoUrl} alt="" className="w-full h-full object-cover" /> : <span>👤</span>}
-        </div>
+      <div className="mb-6">
+        <AvatarUpload photoUrl={angler.photoUrl} onChange={onPhotoChange} fallback="👤" size={80} />
+      </div>
+
+      <div className="mb-7">
+        <div style={{ color: COLORS.paperDim, fontSize: 12, fontFamily: MONO }}>YOUR ACCOUNT</div>
+        <h1 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 22, fontWeight: 600, marginTop: 2 }}>{angler.name}</h1>
+        <div style={{ color: COLORS.paperDim, fontSize: 13, marginTop: 1 }}>{angler.email}</div>
       </div>
 
       {angler.joinIndex && <FoundingAnglerCard joinIndex={angler.joinIndex} />}
@@ -2027,7 +2025,7 @@ function listingWhen(l) {
   return Infinity;
 }
 
-function CaptainDashboard({ captain, joinIndex, bookings, onExit, onSettings }) {
+function CaptainDashboard({ captain, joinIndex, bookings, onExit, onSettings, onPhotoChange }) {
   const [listings, setListings] = useState([
     { id: 1, kind: "cancellation", species: "Redfish, Trout", spots: 2, price: 90, hours: 3, notes: "" },
   ]);
@@ -2077,16 +2075,15 @@ function CaptainDashboard({ captain, joinIndex, bookings, onExit, onSettings }) 
         </button>
       </div>
 
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <div style={{ color: COLORS.paperDim, fontSize: 12, fontFamily: MONO }}>WELCOME BACK</div>
-          <h1 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 22, fontWeight: 600, marginTop: 2 }}>{captain.name || "Captain"}</h1>
-          <div style={{ color: COLORS.paperDim, fontSize: 13, marginTop: 1 }}>
-            {captain.boat} · {captain.location}
-          </div>
-        </div>
-        <div className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden" style={{ background: COLORS.teal }}>
-          {captain.photoUrl ? <img src={captain.photoUrl} alt="" className="w-full h-full object-cover" /> : <span>⚓</span>}
+      <div className="mb-5">
+        <AvatarUpload photoUrl={captain.photoUrl} onChange={onPhotoChange} fallback="⚓" size={80} />
+      </div>
+
+      <div className="mb-6">
+        <div style={{ color: COLORS.paperDim, fontSize: 12, fontFamily: MONO }}>WELCOME BACK</div>
+        <h1 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 22, fontWeight: 600, marginTop: 2 }}>{captain.name || "Captain"}</h1>
+        <div style={{ color: COLORS.paperDim, fontSize: 13, marginTop: 1 }}>
+          {captain.boat} · {captain.location}
         </div>
       </div>
 
@@ -2465,6 +2462,7 @@ export default function LastCastApp() {
                   setCustomerView("tripDetail");
                 }}
                 onSettings={() => setCustomerView("anglerSettings")}
+                onPhotoChange={(dataUrl) => setAngler({ ...angler, photoUrl: dataUrl })}
               />
             )}
             {customerView === "anglerSettings" && angler && (
@@ -2493,9 +2491,6 @@ export default function LastCastApp() {
                 showLicense
                 licenseFileName={angler.licenseFileName}
                 onUploadLicense={(fileName) => setAngler({ ...angler, licenseFileName: fileName })}
-                photoUrl={angler.photoUrl}
-                photoFallback="👤"
-                onPhotoChange={(dataUrl) => setAngler({ ...angler, photoUrl: dataUrl })}
               />
             )}
             {customerView === "tripDetail" && activeTrip && (
@@ -2551,6 +2546,7 @@ export default function LastCastApp() {
                 bookings={anglerBookings}
                 onExit={goBackToApp}
                 onSettings={() => setCaptainView("settings")}
+                onPhotoChange={(dataUrl) => setCaptain({ ...captain, photoUrl: dataUrl })}
               />
             )}
             {captainView === "settings" && (
@@ -2573,9 +2569,6 @@ export default function LastCastApp() {
                   setCaptainView("login");
                 }}
                 deleteLabel="Delete captain account"
-                photoUrl={captain.photoUrl}
-                photoFallback="⚓"
-                onPhotoChange={(dataUrl) => setCaptain({ ...captain, photoUrl: dataUrl })}
               />
             )}
           </>
