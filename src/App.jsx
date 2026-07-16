@@ -929,10 +929,10 @@ function PrivateCharterCard({ c, onSelect, isFavorited, onToggleFavorite }) {
   );
 }
 
-function Home({ onSelect, onCaptainPortal, onAccount, angler, favoriteIds, onToggleFavorite }) {
+function Home({ onSelect, onCaptainPortal, onAccount, angler, favoriteIds, onToggleFavorite, onSearch }) {
   const [tab, setTab] = useState("deals"); // "deals" | "browse" | "private" | "saved"
   const [category, setCategory] = useState("All");
-  const [query, setQuery] = useState("");
+  const [searchDraft, setSearchDraft] = useState("");
   const [nearMe, setNearMe] = useState(false);
   const [sortMode, setSortMode] = useState("default"); // "default" | "priceLow" | "priceHigh"
 
@@ -942,15 +942,12 @@ function Home({ onSelect, onCaptainPortal, onAccount, angler, favoriteIds, onTog
     : tab === "private" ? PRIVATE_CHARTERS
     : ALL_CHARTERS.filter((c) => favoriteIds.includes(c.id));
 
+  // Category still filters the current tab live. Text search does NOT —
+  // it only takes effect on Enter, jumping to a separate results page, so
+  // typing never changes what's shown on the Home tab itself.
   const filtered = useMemo(() => {
-    return source.filter((c) => {
-      const matchesCat = category === "All" || c.type === category;
-      const q = query.trim().toLowerCase();
-      const matchesQuery =
-        !q || c.location.toLowerCase().includes(q) || c.species.some((s) => s.toLowerCase().includes(q));
-      return matchesCat && matchesQuery;
-    });
-  }, [source, category, query]);
+    return source.filter((c) => category === "All" || c.type === category);
+  }, [source, category]);
 
   const priceOf = (c) => (c.saleType === "private" ? c.totalPrice : c.price);
 
@@ -1012,9 +1009,14 @@ function Home({ onSelect, onCaptainPortal, onAccount, angler, favoriteIds, onTog
         <div className="mt-6 flex items-center gap-2 rounded-xl px-4 py-3" style={{ background: COLORS.paper }}>
           <span style={{ opacity: 0.5 }}>⌕</span>
           <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by location or species..."
+            value={searchDraft}
+            onChange={(e) => setSearchDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && searchDraft.trim()) {
+                onSearch(searchDraft.trim());
+              }
+            }}
+            placeholder="Search by location or species... (press Enter)"
             className="flex-1 bg-transparent outline-none text-sm"
             style={{ color: COLORS.ink }}
           />
@@ -1080,16 +1082,6 @@ function Home({ onSelect, onCaptainPortal, onAccount, angler, favoriteIds, onTog
               📍 {nearMe ? "Sorted near you" : "Sort near me"}
             </button>
           )}
-          <select
-            value={sortMode}
-            onChange={(e) => setSortMode(e.target.value)}
-            className="px-3 py-1.5 rounded-full text-xs font-medium outline-none"
-            style={{ background: "transparent", border: `1px solid ${COLORS.line}`, color: COLORS.paperDim }}
-          >
-            <option value="default" style={{ color: COLORS.ink }}>Sort: Default</option>
-            <option value="priceLow" style={{ color: COLORS.ink }}>Price: Low to High</option>
-            <option value="priceHigh" style={{ color: COLORS.ink }}>Price: High to Low</option>
-          </select>
         </div>
       </div>
 
@@ -1138,9 +1130,19 @@ function Home({ onSelect, onCaptainPortal, onAccount, angler, favoriteIds, onTog
       )}
 
       <div className="px-6 pt-2 pb-10" style={{ background: COLORS.ink }}>
-        <h2 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 19, fontWeight: 600, marginBottom: 12 }}>
+        <h2 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 19, fontWeight: 600, marginBottom: 8 }}>
           {tab === "deals" ? "All open seats" : tab === "browse" ? "Upcoming charters" : tab === "private" ? "Whole-boat charters" : "Your saved charters"}
         </h2>
+        <select
+          value={sortMode}
+          onChange={(e) => setSortMode(e.target.value)}
+          className="px-3 py-1.5 rounded-full text-xs font-medium outline-none mb-3"
+          style={{ background: "transparent", border: `1px solid ${COLORS.line}`, color: COLORS.paperDim }}
+        >
+          <option value="default" style={{ color: COLORS.ink }}>Sort: Default</option>
+          <option value="priceLow" style={{ color: COLORS.ink }}>Price: Low to High</option>
+          <option value="priceHigh" style={{ color: COLORS.ink }}>Price: High to Low</option>
+        </select>
         <div className="flex flex-col gap-3">
           {sortedFiltered.length === 0 && (
             <div style={{ color: COLORS.paperDim, fontSize: 14 }}>
@@ -1209,6 +1211,61 @@ function Home({ onSelect, onCaptainPortal, onAccount, angler, favoriteIds, onTog
               )
             )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------
+   CUSTOMER: SEARCH RESULTS (separate page, only reached by pressing Enter)
+--------------------------------------------------------------------- */
+function SearchResultsPage({ initialQuery, onSelect, onBack, favoriteIds, onToggleFavorite }) {
+  const [query, setQuery] = useState(initialQuery);
+  const [submitted, setSubmitted] = useState(initialQuery);
+
+  const results = useMemo(() => {
+    const q = submitted.trim().toLowerCase();
+    if (!q) return [];
+    return ALL_CHARTERS.filter(
+      (c) => c.location.toLowerCase().includes(q) || c.species.some((s) => s.toLowerCase().includes(q)) || c.boat.toLowerCase().includes(q)
+    );
+  }, [submitted]);
+
+  return (
+    <div className="px-6 pt-6 pb-14" style={{ background: COLORS.ink, minHeight: "100%" }}>
+      <button onClick={onBack} style={{ color: COLORS.paperDim, fontSize: 14 }} className="mb-4">
+        ← Back to app
+      </button>
+
+      <div className="flex items-center gap-2 rounded-xl px-4 py-3 mb-2" style={{ background: COLORS.paper }}>
+        <span style={{ opacity: 0.5 }}>⌕</span>
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && query.trim()) setSubmitted(query.trim());
+          }}
+          placeholder="Search by location, species, or boat..."
+          className="flex-1 bg-transparent outline-none text-sm"
+          style={{ color: COLORS.ink }}
+          autoFocus
+        />
+      </div>
+      <p style={{ color: COLORS.paperDim, fontSize: 12, marginBottom: 16 }}>
+        {results.length} result{results.length !== 1 ? "s" : ""} for "{submitted}"
+      </p>
+
+      <div className="flex flex-col gap-3">
+        {results.length === 0 && (
+          <p style={{ color: COLORS.paperDim, fontSize: 14 }}>No charters match that search — try a different spot, species, or boat name.</p>
+        )}
+        {results.map((c) =>
+          c.saleType === "private" ? (
+            <PrivateCharterCard key={c.id} c={c} onSelect={onSelect} isFavorited={favoriteIds.includes(c.id)} onToggleFavorite={() => onToggleFavorite(c.id)} />
+          ) : (
+            <BrowseListingCard key={c.id} c={c} onSelect={onSelect} isFavorited={favoriteIds.includes(c.id)} onToggleFavorite={() => onToggleFavorite(c.id)} />
+          )
+        )}
       </div>
     </div>
   );
@@ -3091,6 +3148,7 @@ export default function LastCastApp() {
   const [sponsors, setSponsors] = useState([]);
   const [extraReviews, setExtraReviews] = useState({});
   const [favoriteIds, setFavoriteIds] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const toggleFavorite = (id) =>
     setFavoriteIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
@@ -3142,6 +3200,22 @@ export default function LastCastApp() {
                 onCaptainPortal={goCaptainPortal}
                 onAccount={goAccount}
                 angler={angler}
+                favoriteIds={favoriteIds}
+                onToggleFavorite={toggleFavorite}
+                onSearch={(q) => {
+                  setSearchQuery(q);
+                  setCustomerView("search");
+                }}
+              />
+            )}
+            {customerView === "search" && (
+              <SearchResultsPage
+                initialQuery={searchQuery}
+                onSelect={(c) => {
+                  setCharter(c);
+                  setCustomerView("detail");
+                }}
+                onBack={() => setCustomerView("home")}
                 favoriteIds={favoriteIds}
                 onToggleFavorite={toggleFavorite}
               />
