@@ -462,7 +462,7 @@ function Toggle({ checked, onChange }) {
 /* ---------------------------------------------------------------------
    SHARED: SETTINGS (used by both anglers and captains)
 --------------------------------------------------------------------- */
-function SettingsScreen({ title, fields, onSave, onLogout, onBack, onDeleteAccount, deleteLabel }) {
+function SettingsScreen({ title, fields, onSave, onLogout, onBack, onDeleteAccount, deleteLabel, showLicense, licenseFileName, onUploadLicense }) {
   const [tab, setTab] = useState("profile"); // "profile" or "privacy"
   const [values, setValues] = useState(() => Object.fromEntries(fields.map((f) => [f.key, f.value || ""])));
   const [saved, setSaved] = useState(false);
@@ -521,6 +521,28 @@ function SettingsScreen({ title, fields, onSave, onLogout, onBack, onDeleteAccou
           >
             {saved ? "Saved ✓" : "Save changes"}
           </PrimaryButton>
+
+          {showLicense && (
+            <div className="mt-3">
+              <h3 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Fishing license</h3>
+              <p style={{ color: COLORS.paperDim, fontSize: 11.5, marginBottom: 10, lineHeight: 1.4 }}>
+                Optional, but it's automatically attached at checkout on any charter you pay for — whether or not
+                that charter requires proof, so there's nothing to dig up at the dock.
+              </p>
+              <div
+                className="rounded-2xl p-5 flex flex-col items-center justify-center text-center gap-2 cursor-pointer"
+                style={{ background: COLORS.inkSoft, border: `1.5px dashed ${COLORS.line}` }}
+                onClick={() => onUploadLicense("fishing_license_scan.pdf")}
+              >
+                <span style={{ fontSize: 20 }}>📄</span>
+                <span style={{ color: COLORS.paper, fontSize: 13.5, fontWeight: 500 }}>
+                  {licenseFileName ? licenseFileName : "Tap to upload or update your license"}
+                </span>
+                <span style={{ color: COLORS.paperDim, fontSize: 11.5 }}>PDF or photo, under 10MB</span>
+                {licenseFileName && <span style={{ color: COLORS.teal, fontSize: 11.5, marginTop: 2 }}>✓ On file</span>}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1039,14 +1061,15 @@ function Detail({ charter, onBack, onBook }) {
 /* ---------------------------------------------------------------------
    CUSTOMER: BOOKING
 --------------------------------------------------------------------- */
-function Booking({ charter, onBack, onConfirm }) {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+function Booking({ charter, angler, onBack, onNext }) {
+  const [name, setName] = useState(angler?.name || "");
+  const [email, setEmail] = useState(angler?.email || "");
   const [spots, setSpots] = useState(1);
   const isPrivate = charter.saleType === "private";
   const isWaitlist = !isPrivate && charter.spotsLeft <= 0;
   const valid = name.trim().length > 1 && email.includes("@");
   const total = isPrivate ? charter.totalPrice : charter.price * spots;
+  const licenseRequired = Boolean(charter.licenseNote) && !/no .*license needed/i.test(charter.licenseNote || "");
 
   return (
     <div style={{ background: COLORS.ink, minHeight: "100%" }} className="px-6 pt-6 pb-10">
@@ -1098,8 +1121,35 @@ function Booking({ charter, onBack, onConfirm }) {
           </div>
         )}
 
-        <PrimaryButton disabled={!valid} onClick={() => onConfirm({ name, email, spots: isWaitlist ? 0 : spots, waitlist: isWaitlist })}>
-          {isPrivate ? "Confirm charter" : isWaitlist ? "Join waitlist" : "Confirm booking"}
+        {!isWaitlist && (
+          <div
+            className="rounded-2xl p-3.5"
+            style={{
+              background: COLORS.inkSoft,
+              border: `1px solid ${licenseRequired && !angler?.licenseFileName ? COLORS.rust : COLORS.line}`,
+            }}
+          >
+            <div style={{ color: COLORS.paperDim, fontSize: 11, fontFamily: MONO, marginBottom: 4 }}>FISHING LICENSE</div>
+            {angler?.licenseFileName ? (
+              <p style={{ color: COLORS.teal, fontSize: 12.5, lineHeight: 1.4 }}>
+                ✓ {angler.licenseFileName} will be shared with {charter.captain} automatically.
+              </p>
+            ) : licenseRequired ? (
+              <p style={{ color: COLORS.rust, fontSize: 12.5, lineHeight: 1.4 }}>
+                {charter.licenseNote} — you don't have one on file yet. Add it anytime in Account → Settings, or
+                bring it with you.
+              </p>
+            ) : (
+              <p style={{ color: COLORS.paperDim, fontSize: 12.5, lineHeight: 1.4 }}>
+                {charter.licenseNote || "No license required for this charter."} You don't have one on file — optional,
+                but you can add one anytime in Account → Settings so it's ready for charters that do need it.
+              </p>
+            )}
+          </div>
+        )}
+
+        <PrimaryButton disabled={!valid} onClick={() => onNext({ name, email, spots: isWaitlist ? 0 : spots, waitlist: isWaitlist })}>
+          {isWaitlist ? "Join waitlist" : "Review booking"}
         </PrimaryButton>
       </div>
     </div>
@@ -1114,6 +1164,98 @@ function Row({ label, value }) {
     <div className="flex items-center justify-between py-2" style={{ borderBottom: `1px solid ${COLORS.line}` }}>
       <span style={{ color: COLORS.paperDim, fontSize: 12, fontFamily: MONO }}>{label}</span>
       <span style={{ color: COLORS.paper, fontSize: 13 }}>{value}</span>
+    </div>
+  );
+}
+
+function ReviewBooking({ charter, draft, angler, onBack, onConfirm }) {
+  const isPrivate = charter.saleType === "private";
+  const total = isPrivate ? charter.totalPrice : charter.price * draft.spots;
+
+  return (
+    <div style={{ background: COLORS.ink, minHeight: "100%" }} className="px-6 pt-6 pb-28">
+      <button onClick={onBack} style={{ color: COLORS.paperDim, fontSize: 14 }} className="mb-4">
+        ← Back
+      </button>
+      <Header eyebrow="REVIEW BOOKING" title="Everything look right?" />
+
+      <div className="rounded-2xl p-4" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
+        <div className="flex items-center gap-3">
+          <div className="w-14 h-14 rounded-xl flex-shrink-0" style={{ background: charter.img }} />
+          <div className="min-w-0">
+            <div style={{ color: COLORS.paper, fontWeight: 600, fontSize: 15 }}>{charter.boat}</div>
+            <div style={{ color: COLORS.paperDim, fontSize: 12, marginTop: 1 }}>
+              {charter.captain} · {charter.location}
+            </div>
+          </div>
+        </div>
+        <div className="flex gap-1.5 mt-3 flex-wrap">
+          {charter.species.map((s) => (
+            <Tag key={s} tone="teal">{s}</Tag>
+          ))}
+          <Tag tone="gold">{charter.type}</Tag>
+          {isPrivate && <Tag tone="rust">Whole boat · up to {charter.maxGuests}</Tag>}
+        </div>
+      </div>
+
+      <div className="rounded-2xl p-4 mt-3" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
+        <Row label="Departs" value={formatDateTime(charter.departure)} />
+        <Row label="Trip length" value={charter.duration} />
+        <Row label="Meeting point" value={charter.meetingPoint || charter.location} />
+        <Row label={isPrivate ? "Guests" : "Seats"} value={draft.spots} />
+        <Row label="Booking name" value={draft.name} />
+        <Row label="Email" value={draft.email} />
+        {charter.licenseNote && <Row label="License" value={charter.licenseNote} />}
+      </div>
+
+      {charter.included?.length > 0 && (
+        <div className="mt-5">
+          <h3 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 15, fontWeight: 600, marginBottom: 8 }}>What's included</h3>
+          <div className="flex flex-col gap-1.5">
+            {charter.included.map((item) => (
+              <div key={item} className="flex items-center gap-2">
+                <span style={{ color: COLORS.teal, fontSize: 13 }}>✓</span>
+                <span style={{ color: COLORS.paperDim, fontSize: 13.5 }}>{item}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div
+        className="rounded-2xl p-3.5 mt-5"
+        style={{ background: COLORS.inkSoft, border: `1px solid ${angler?.licenseFileName ? COLORS.line : COLORS.gold + "55"}` }}
+      >
+        <div style={{ color: COLORS.paperDim, fontSize: 11, fontFamily: MONO, marginBottom: 4 }}>FISHING LICENSE</div>
+        <p style={{ color: angler?.licenseFileName ? COLORS.teal : COLORS.paperDim, fontSize: 12.5, lineHeight: 1.4 }}>
+          {angler?.licenseFileName
+            ? `✓ ${angler.licenseFileName} will be shared with ${charter.captain} automatically.`
+            : "No license on file — add one anytime in Account → Settings."}
+        </p>
+      </div>
+
+      {charter.weatherNote && (
+        <p style={{ color: COLORS.paperDim, fontSize: 11.5, lineHeight: 1.5, marginTop: 14, opacity: 0.8, fontStyle: "italic" }}>
+          {charter.weatherNote}
+        </p>
+      )}
+
+      <div
+        className="fixed bottom-0 left-0 right-0 px-6 py-4 flex items-center justify-between"
+        style={{ background: COLORS.ink, borderTop: `1px solid ${COLORS.line}`, maxWidth: 480, margin: "0 auto" }}
+      >
+        <div>
+          <span style={{ fontFamily: MONO, color: COLORS.paper, fontSize: 20, fontWeight: 500 }}>${total}</span>
+          <div style={{ fontSize: 11, color: COLORS.paperDim }}>{isPrivate ? "total trip" : `${draft.spots} seat${draft.spots > 1 ? "s" : ""}`}</div>
+        </div>
+        <button
+          onClick={() => onConfirm(draft)}
+          className="px-6 py-3 rounded-full font-semibold text-sm"
+          style={{ background: COLORS.rust, color: COLORS.paper }}
+        >
+          Confirm booking
+        </button>
+      </div>
     </div>
   );
 }
@@ -2029,6 +2171,7 @@ export default function LastCastApp() {
   const [customerView, setCustomerView] = useState("home");
   const [charter, setCharter] = useState(null);
   const [booking, setBooking] = useState(null);
+  const [bookingDraft, setBookingDraft] = useState(null);
 
   // angler account state — separate from the guest-checkout booking flow above
   const [angler, setAngler] = useState(null);
@@ -2066,6 +2209,24 @@ export default function LastCastApp() {
     setCustomerView(angler ? "account" : "anglerLogin");
   };
 
+  const finalizeBooking = (draft) => {
+    setBooking(draft);
+    setCustomerView("confirmed");
+    setAnglerBookings((prev) => [
+      ...prev,
+      {
+        id: `b-${Date.now()}`,
+        charter,
+        spots: draft.spots,
+        status: "upcoming",
+        waitlist: Boolean(draft.waitlist),
+        messages: draft.waitlist
+          ? []
+          : [{ from: "captain", text: `Confirmed! Meet at ${charter.meetingPoint || charter.location}.` }],
+      },
+    ]);
+  };
+
   return (
     <div className="w-full flex items-center justify-center" style={{ background: "#000", minHeight: "100vh", fontFamily: "'Inter', sans-serif" }}>
       <link rel="stylesheet" href={FONTS_LINK} />
@@ -2089,24 +2250,25 @@ export default function LastCastApp() {
             {customerView === "booking" && charter && (
               <Booking
                 charter={charter}
+                angler={angler}
                 onBack={() => setCustomerView("detail")}
-                onConfirm={(b) => {
-                  setBooking(b);
-                  setCustomerView("confirmed");
-                  setAnglerBookings((prev) => [
-                    ...prev,
-                    {
-                      id: `b-${Date.now()}`,
-                      charter,
-                      spots: b.spots,
-                      status: "upcoming",
-                      waitlist: Boolean(b.waitlist),
-                      messages: b.waitlist
-                        ? []
-                        : [{ from: "captain", text: `Confirmed! Meet at ${charter.meetingPoint || charter.location}.` }],
-                    },
-                  ]);
+                onNext={(draft) => {
+                  if (draft.waitlist) {
+                    finalizeBooking(draft);
+                  } else {
+                    setBookingDraft(draft);
+                    setCustomerView("reviewBooking");
+                  }
                 }}
+              />
+            )}
+            {customerView === "reviewBooking" && charter && bookingDraft && (
+              <ReviewBooking
+                charter={charter}
+                draft={bookingDraft}
+                angler={angler}
+                onBack={() => setCustomerView("booking")}
+                onConfirm={(draft) => finalizeBooking(draft)}
               />
             )}
             {customerView === "confirmed" && charter && booking && (
@@ -2117,6 +2279,7 @@ export default function LastCastApp() {
                   setCustomerView("home");
                   setCharter(null);
                   setBooking(null);
+                  setBookingDraft(null);
                 }}
               />
             )}
@@ -2179,6 +2342,9 @@ export default function LastCastApp() {
                   setAnglerBookings([]);
                   setCustomerView("home");
                 }}
+                showLicense
+                licenseFileName={angler.licenseFileName}
+                onUploadLicense={(fileName) => setAngler({ ...angler, licenseFileName: fileName })}
               />
             )}
             {customerView === "tripDetail" && activeTrip && (
