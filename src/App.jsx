@@ -1020,6 +1020,7 @@ function AnglerLogin({ onLogin, onNew, onBack }) {
 
 function AnglerRegister({ onCreate, onBack }) {
   const [form, setForm] = useState({ firstName: "", lastName: "", phone: "", email: "", zip: "", password: "" });
+  const [licenseFileName, setLicenseFileName] = useState("");
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
   const valid =
     form.firstName.trim() &&
@@ -1042,6 +1043,22 @@ function AnglerRegister({ onCreate, onBack }) {
         <Field label="EMAIL" type="email" value={form.email} onChange={set("email")} placeholder="you@email.com" />
         <Field label="CURRENT ZIP CODE" value={form.zip} onChange={set("zip")} placeholder="33040" maxLength={5} />
         <Field label="PASSWORD" type="password" value={form.password} onChange={set("password")} placeholder="••••••••" />
+
+        <label className="flex flex-col gap-1.5">
+          <span style={{ color: COLORS.paperDim, fontSize: 12, fontFamily: MONO }}>FISHING LICENSE (OPTIONAL)</span>
+          <div
+            className="rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-1.5 cursor-pointer"
+            style={{ background: COLORS.inkSoft, border: `1.5px dashed ${COLORS.line}` }}
+            onClick={() => setLicenseFileName("fishing_license_scan.pdf")}
+          >
+            <span style={{ fontSize: 18 }}>📄</span>
+            <span style={{ color: COLORS.paper, fontSize: 13, fontWeight: 500 }}>
+              {licenseFileName ? licenseFileName : "Tap to upload — have it ready for charters that require one"}
+            </span>
+            {licenseFileName && <span style={{ color: COLORS.teal, fontSize: 11.5 }}>✓ On file</span>}
+          </div>
+        </label>
+
         <PrimaryButton
           disabled={!valid}
           onClick={() =>
@@ -1052,6 +1069,7 @@ function AnglerRegister({ onCreate, onBack }) {
               phone: form.phone.trim(),
               email: form.email.trim(),
               zip: form.zip.trim(),
+              licenseFileName,
             })
           }
         >
@@ -1951,9 +1969,6 @@ export default function LastCastApp() {
                   setAnglerBookings([]);
                   setCustomerView("home");
                 }}
-                showLicense
-                licenseFileName={angler.licenseFileName}
-                onUploadLicense={(fileName) => setAngler({ ...angler, licenseFileName: fileName })}
               />
             )}
             {customerView === "tripDetail" && activeTrip && (
