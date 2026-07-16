@@ -272,6 +272,10 @@ const PRIVATE_CHARTERS = [
   },
 ];
 
+// Combined list across all listing types — used for cross-cutting features
+// like matching a captain to their reviews regardless of listing type.
+const ALL_CHARTERS = [...CHARTERS, ...STANDARD_CHARTERS, ...PRIVATE_CHARTERS];
+
 const CATEGORIES = [
   { key: "All", icon: "⚓" },
   { key: "Offshore", icon: "🌊" },
@@ -967,7 +971,7 @@ function Home({ onSelect, onCaptainPortal, onAccount, angler }) {
 /* ---------------------------------------------------------------------
    CUSTOMER: DETAIL
 --------------------------------------------------------------------- */
-function Detail({ charter, onBack, onBook }) {
+function Detail({ charter, onBack, onBook, onViewReviews }) {
   const reviewCount = charter.reviews?.length || 0;
   return (
     <div style={{ background: COLORS.ink, minHeight: "100%" }}>
@@ -989,10 +993,20 @@ function Detail({ charter, onBack, onBook }) {
 
       <div className="px-6 pt-5 pb-28">
         <h1 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 26, fontWeight: 600 }}>{charter.boat}</h1>
-        <div style={{ color: COLORS.paperDim, fontSize: 14, marginTop: 2 }}>
-          {charter.captain} · {charter.location} · ★ {charter.rating}
-          {reviewCount > 0 && ` (${reviewCount} review${reviewCount > 1 ? "s" : ""})`}
-        </div>
+        {reviewCount > 0 ? (
+          <button onClick={onViewReviews} className="flex items-center gap-1" style={{ marginTop: 2 }}>
+            <span style={{ color: COLORS.paperDim, fontSize: 14 }}>
+              {charter.captain} · {charter.location} · ★ {charter.rating}
+            </span>
+            <span style={{ color: COLORS.teal, fontSize: 14, textDecoration: "underline" }}>
+              ({reviewCount} review{reviewCount > 1 ? "s" : ""})
+            </span>
+          </button>
+        ) : (
+          <div style={{ color: COLORS.paperDim, fontSize: 14, marginTop: 2 }}>
+            {charter.captain} · {charter.location} · ★ {charter.rating}
+          </div>
+        )}
 
         {(charter.captainYears || charter.licensed) && (
           <div style={{ color: COLORS.gold, fontSize: 12.5, marginTop: 4, fontFamily: MONO }}>
@@ -1096,11 +1110,12 @@ function Detail({ charter, onBack, onBook }) {
 
         {reviewCount > 0 && (
           <div className="mt-6">
-            <h3 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 16, fontWeight: 600, marginBottom: 10 }}>
-              Reviews ({reviewCount})
-            </h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 16, fontWeight: 600 }}>Reviews ({reviewCount})</h3>
+              <button onClick={onViewReviews} style={{ color: COLORS.teal, fontSize: 12.5 }}>See all →</button>
+            </div>
             <div className="flex flex-col gap-3">
-              {charter.reviews.map((r, i) => (
+              {charter.reviews.slice(0, 2).map((r, i) => (
                 <div key={i} className="rounded-2xl p-3.5" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
                   <div className="flex items-center justify-between">
                     <span style={{ color: COLORS.paper, fontSize: 13.5, fontWeight: 500 }}>{r.name}</span>
@@ -1143,6 +1158,56 @@ function Detail({ charter, onBack, onBook }) {
             </button>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------
+   CUSTOMER: CHARTER REVIEWS PAGE
+--------------------------------------------------------------------- */
+function CharterReviewsPage({ charter, replies, onBack }) {
+  const reviews = charter.reviews || [];
+  return (
+    <div className="px-6 pt-6 pb-14">
+      <button onClick={onBack} style={{ color: COLORS.paperDim, fontSize: 14 }} className="mb-4">
+        ← Back
+      </button>
+
+      <div className="flex items-center gap-3 mb-2">
+        <div className="w-12 h-12 rounded-xl flex-shrink-0" style={{ background: charter.img }} />
+        <div className="min-w-0">
+          <h1 className="truncate" style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 19, fontWeight: 600 }}>{charter.boat}</h1>
+          <div className="truncate" style={{ color: COLORS.paperDim, fontSize: 12.5 }}>{charter.captain} · {charter.location}</div>
+        </div>
+      </div>
+      <div style={{ color: COLORS.gold, fontSize: 14, marginBottom: 6 }}>
+        ★ {charter.rating} · {reviews.length} review{reviews.length !== 1 ? "s" : ""}
+      </div>
+
+      <div className="flex flex-col gap-3 mt-4">
+        {reviews.map((r, i) => {
+          const key = `${charter.id}-${i}`;
+          const reply = replies?.[key];
+          return (
+            <div key={key} className="rounded-2xl p-3.5" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
+              <div className="flex items-center justify-between">
+                <span style={{ color: COLORS.paper, fontSize: 13.5, fontWeight: 500 }}>{r.name}</span>
+                <span style={{ color: COLORS.gold, fontSize: 12.5 }}>{"★".repeat(r.rating)}</span>
+              </div>
+              <p style={{ color: COLORS.paperDim, fontSize: 13, marginTop: 4, lineHeight: 1.5 }}>{r.comment}</p>
+              {reply && (
+                <div className="mt-2.5 pt-2.5 pl-3" style={{ borderTop: `1px solid ${COLORS.line}`, borderLeft: `2px solid ${COLORS.teal}` }}>
+                  <div style={{ color: COLORS.teal, fontSize: 11, fontFamily: MONO }}>
+                    REPLY FROM {charter.captain?.toUpperCase()}
+                  </div>
+                  <p style={{ color: COLORS.paperDim, fontSize: 12.5, marginTop: 2, lineHeight: 1.4 }}>{reply}</p>
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {reviews.length === 0 && <p style={{ color: COLORS.paperDim, fontSize: 14 }}>No reviews yet for this charter.</p>}
       </div>
     </div>
   );
@@ -2025,7 +2090,7 @@ function listingWhen(l) {
   return Infinity;
 }
 
-function CaptainDashboard({ captain, joinIndex, bookings, onExit, onSettings, onPhotoChange }) {
+function CaptainDashboard({ captain, joinIndex, bookings, onExit, onSettings, onPhotoChange, onOpenBooking, reviewReplies, onReplyReview }) {
   const [listings, setListings] = useState([
     { id: 1, kind: "cancellation", species: "Redfish, Trout", spots: 2, price: 90, hours: 3, notes: "" },
   ]);
@@ -2040,6 +2105,15 @@ function CaptainDashboard({ captain, joinIndex, bookings, onExit, onSettings, on
     () => (bookings || []).filter((b) => normalizeCaptainName(b.charter?.captain) === normalizeCaptainName(captain.name)),
     [bookings, captain.name]
   );
+  const myReviews = useMemo(() => {
+    const out = [];
+    ALL_CHARTERS.filter((c) => normalizeCaptainName(c.captain) === normalizeCaptainName(captain.name)).forEach((charter) => {
+      (charter.reviews || []).forEach((review, idx) => {
+        out.push({ key: `${charter.id}-${idx}`, charter, review });
+      });
+    });
+    return out;
+  }, [captain.name]);
 
   const closeForm = () => {
     setShowPost(false);
@@ -2111,7 +2185,12 @@ function CaptainDashboard({ captain, joinIndex, bookings, onExit, onSettings, on
         )}
         <div className="flex flex-col gap-2">
           {myPassengers.map((b) => (
-            <div key={b.id} className="flex items-center gap-3 rounded-2xl p-3" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
+            <button
+              key={b.id}
+              onClick={() => onOpenBooking(b)}
+              className="w-full flex items-center gap-3 rounded-2xl p-3 text-left"
+              style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}
+            >
               <div
                 className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden"
                 style={{ background: avatarColorFor(b.name) }}
@@ -2131,7 +2210,8 @@ function CaptainDashboard({ captain, joinIndex, bookings, onExit, onSettings, on
                   {b.charter.boat} · {b.spots} {b.charter.saleType === "private" ? "guests" : "seats"} · {formatDateTime(b.charter.departure)}
                 </div>
               </div>
-            </div>
+              <span style={{ color: COLORS.paperDim, fontSize: 14 }}>›</span>
+            </button>
           ))}
         </div>
       </div>
@@ -2144,27 +2224,34 @@ function CaptainDashboard({ captain, joinIndex, bookings, onExit, onSettings, on
         + Post a trip
       </button>
 
-      {/* Recent activity — a preview of what real-time booking alerts will look like.
-          This list is static sample data; real notifications need the backend (Firebase) to exist. */}
+      {/* Recent activity — built from real bookings matched to this captain by name.
+          Tap any entry to see the full booking. Instant push/email/SMS alerts still
+          need the backend — this shows the data, not live delivery, yet. */}
       <div className="mt-7">
-        <div className="flex items-center justify-between mb-2">
-          <h2 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 17, fontWeight: 600 }}>Recent activity</h2>
-          <span style={{ color: COLORS.paperDim, fontSize: 10.5, fontFamily: MONO }}>PREVIEW</span>
-        </div>
+        <h2 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 17, fontWeight: 600, marginBottom: 10 }}>Recent activity</h2>
+        {myPassengers.length === 0 && (
+          <p style={{ color: COLORS.paperDim, fontSize: 13 }}>
+            Nothing yet — bookings made under your captain name will show up here.
+          </p>
+        )}
         <div className="flex flex-col gap-2">
-          {[
-            { text: "Danielle R. booked 2 seats on Silver Reel", when: "2h ago" },
-            { text: "Tom W. left a 5★ review", when: "1d ago" },
-          ].map((a, i) => (
-            <div key={i} className="rounded-xl px-3.5 py-2.5 flex items-center justify-between" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
-              <span style={{ color: COLORS.paperDim, fontSize: 12.5 }}>{a.text}</span>
-              <span style={{ color: COLORS.paperDim, fontSize: 11, fontFamily: MONO, opacity: 0.7 }}>{a.when}</span>
-            </div>
-          ))}
+          {[...myPassengers]
+            .sort((a, b) => (b.id > a.id ? 1 : -1))
+            .map((b) => (
+              <button
+                key={b.id}
+                onClick={() => onOpenBooking(b)}
+                className="w-full text-left rounded-xl px-3.5 py-2.5 flex items-center justify-between"
+                style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}
+              >
+                <span style={{ color: COLORS.paperDim, fontSize: 12.5 }}>
+                  {b.name} {b.waitlist ? "joined the waitlist for" : "booked"} {b.spots}{" "}
+                  {b.charter.saleType === "private" ? "guests on" : "seat" + (b.spots > 1 ? "s" : "") + " on"} {b.charter.boat}
+                </span>
+                <span style={{ color: COLORS.paperDim, fontSize: 14 }}>›</span>
+              </button>
+            ))}
         </div>
-        <p style={{ color: COLORS.paperDim, fontSize: 11, marginTop: 6, opacity: 0.7, lineHeight: 1.4 }}>
-          Real booking alerts (email/text the moment a seat sells) go live once the backend is connected.
-        </p>
       </div>
 
       <div className="mt-7">
@@ -2235,6 +2322,8 @@ function CaptainDashboard({ captain, joinIndex, bookings, onExit, onSettings, on
         </div>
       </div>
 
+      <CaptainReviews myReviews={myReviews} replies={reviewReplies} onReply={onReplyReview} />
+
       <div className="mt-7 rounded-2xl p-4" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.teal}55` }}>
         <div style={{ color: COLORS.teal, fontSize: 12, fontFamily: MONO, letterSpacing: 0.5 }}>SPONSORED RATES</div>
 
@@ -2293,6 +2382,127 @@ function CaptainDashboard({ captain, joinIndex, bookings, onExit, onSettings, on
 }
 
 /* ---------------------------------------------------------------------
+   CAPTAIN: BOOKING DETAIL (opened from Recent activity / Booked passengers)
+--------------------------------------------------------------------- */
+function CaptainBookingDetail({ booking, onBack }) {
+  const c = booking.charter;
+  return (
+    <div className="px-6 pt-6 pb-14">
+      <button onClick={onBack} style={{ color: COLORS.paperDim, fontSize: 14 }} className="mb-4">
+        ← Back
+      </button>
+
+      <div className="flex items-center gap-3 mb-6">
+        <div
+          className="w-16 h-16 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden"
+          style={{ background: avatarColorFor(booking.name) }}
+        >
+          {booking.photoUrl ? (
+            <img src={booking.photoUrl} alt="" className="w-full h-full object-cover" />
+          ) : (
+            <span style={{ fontSize: 18, fontWeight: 700, color: COLORS.ink, fontFamily: MONO }}>{initials(booking.name)}</span>
+          )}
+        </div>
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <h1 className="truncate" style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 20, fontWeight: 600 }}>{booking.name}</h1>
+            {booking.waitlist && <Tag tone="teal">Waitlisted</Tag>}
+            {!booking.waitlist && <Tag tone={booking.status === "upcoming" ? "gold" : "teal"}>{booking.status === "upcoming" ? "Upcoming" : "Completed"}</Tag>}
+          </div>
+          <div className="truncate" style={{ color: COLORS.paperDim, fontSize: 12.5, marginTop: 2 }}>{booking.email}</div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl p-4" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
+        <Row label="Trip" value={c.boat} />
+        <Row label={c.saleType === "private" ? "Guests" : "Seats"} value={booking.spots} />
+        <Row label="Departs" value={formatDateTime(c.departure)} />
+        <Row label="Meeting point" value={c.meetingPoint || c.location} />
+        <Row
+          label="Total"
+          value={`$${c.saleType === "private" ? c.totalPrice : c.price * booking.spots}`}
+        />
+      </div>
+
+      <p style={{ color: COLORS.paperDim, fontSize: 11, marginTop: 10, opacity: 0.7, lineHeight: 1.4 }}>
+        This is the full detail behind that Recent activity entry — everything you'd need to know before the trip.
+      </p>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------
+   CAPTAIN: REVIEWS (read + reply)
+--------------------------------------------------------------------- */
+function CaptainReviews({ myReviews, replies, onReply }) {
+  const [openKey, setOpenKey] = useState(null);
+  const [draft, setDraft] = useState("");
+
+  return (
+    <div className="mt-7">
+      <h2 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 17, fontWeight: 600, marginBottom: 4 }}>Reviews</h2>
+      <p style={{ color: COLORS.paperDim, fontSize: 11.5, marginBottom: 10, lineHeight: 1.4, opacity: 0.85 }}>
+        Tap a review to read the full comment and reply.
+      </p>
+      {myReviews.length === 0 && (
+        <p style={{ color: COLORS.paperDim, fontSize: 13 }}>No reviews yet for trips under your captain name.</p>
+      )}
+      <div className="flex flex-col gap-2">
+        {myReviews.map(({ key, charter, review }) => {
+          const isOpen = openKey === key;
+          const existingReply = replies[key];
+          return (
+            <div key={key} className="rounded-2xl p-3.5" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
+              <button
+                className="w-full text-left"
+                onClick={() => {
+                  setOpenKey(isOpen ? null : key);
+                  setDraft(existingReply || "");
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <span style={{ color: COLORS.paper, fontSize: 13.5, fontWeight: 500 }}>{review.name}</span>
+                  <span style={{ color: COLORS.gold, fontSize: 12.5 }}>{"★".repeat(review.rating)}</span>
+                </div>
+                <div style={{ color: COLORS.paperDim, fontSize: 11, marginTop: 1 }}>{charter.boat}</div>
+                <p style={{ color: COLORS.paperDim, fontSize: 13, marginTop: 6, lineHeight: 1.5 }}>{review.comment}</p>
+              </button>
+
+              {existingReply && !isOpen && (
+                <div className="mt-2 pt-2 pl-3" style={{ borderTop: `1px solid ${COLORS.line}`, borderLeft: `2px solid ${COLORS.teal}` }}>
+                  <div style={{ color: COLORS.teal, fontSize: 11, fontFamily: MONO }}>YOUR REPLY</div>
+                  <p style={{ color: COLORS.paperDim, fontSize: 12.5, marginTop: 2, lineHeight: 1.4 }}>{existingReply}</p>
+                </div>
+              )}
+
+              {isOpen && (
+                <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${COLORS.line}` }}>
+                  <Field
+                    label="YOUR REPLY"
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    placeholder="Thanks for coming out with us..."
+                  />
+                  <PrimaryButton
+                    disabled={!draft.trim()}
+                    onClick={() => {
+                      onReply(key, draft.trim());
+                      setOpenKey(null);
+                    }}
+                  >
+                    {existingReply ? "Update reply" : "Post reply"}
+                  </PrimaryButton>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------
    APP SHELL — unifies customer app + captain portal with shared nav
 --------------------------------------------------------------------- */
 function wantsCaptainEntry() {
@@ -2338,6 +2548,9 @@ export default function LastCastApp() {
   const cameFromDirectLink = useMemo(() => wantsCaptainEntry(), []);
   const [captain, setCaptain] = useState({});
   const joinIndex = CAPTAINS_JOINED_SO_FAR + 1;
+  const [reviewReplies, setReviewReplies] = useState({});
+  const [activeCaptainBookingId, setActiveCaptainBookingId] = useState(null);
+  const activeCaptainBooking = anglerBookings.find((b) => b.id === activeCaptainBookingId) || null;
 
   const goCaptainPortal = () => {
     setSide("captain");
@@ -2390,7 +2603,15 @@ export default function LastCastApp() {
               />
             )}
             {customerView === "detail" && charter && (
-              <Detail charter={charter} onBack={() => setCustomerView("home")} onBook={() => setCustomerView("booking")} />
+              <Detail
+                charter={charter}
+                onBack={() => setCustomerView("home")}
+                onBook={() => setCustomerView("booking")}
+                onViewReviews={() => setCustomerView("charterReviews")}
+              />
+            )}
+            {customerView === "charterReviews" && charter && (
+              <CharterReviewsPage charter={charter} replies={reviewReplies} onBack={() => setCustomerView("detail")} />
             )}
             {customerView === "booking" && charter && (
               <Booking
@@ -2547,7 +2768,16 @@ export default function LastCastApp() {
                 onExit={goBackToApp}
                 onSettings={() => setCaptainView("settings")}
                 onPhotoChange={(dataUrl) => setCaptain({ ...captain, photoUrl: dataUrl })}
+                reviewReplies={reviewReplies}
+                onReplyReview={(key, text) => setReviewReplies((prev) => ({ ...prev, [key]: text }))}
+                onOpenBooking={(b) => {
+                  setActiveCaptainBookingId(b.id);
+                  setCaptainView("bookingDetail");
+                }}
               />
+            )}
+            {captainView === "bookingDetail" && activeCaptainBooking && (
+              <CaptainBookingDetail booking={activeCaptainBooking} onBack={() => setCaptainView("dashboard")} />
             )}
             {captainView === "settings" && (
               <SettingsScreen
