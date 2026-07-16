@@ -125,7 +125,7 @@ const CHARTERS = [
     type: "Fly",
     departure: inHours(30),
     duration: "8 hrs",
-    spotsLeft: 1,
+    spotsLeft: 0,
     totalSpots: 2,
     price: 210,
     originalPrice: 300,
@@ -583,7 +583,7 @@ function Home({ onSelect, onCaptainPortal }) {
                     {c.species.map((s) => (
                       <Tag key={s} tone="teal">{s}</Tag>
                     ))}
-                    <Tag tone="rust">{c.spotsLeft} left</Tag>
+                    <Tag tone="rust">{c.spotsLeft > 0 ? `${c.spotsLeft} left` : "Sold out"}</Tag>
                   </div>
                 </div>
                 <div className="text-right flex-shrink-0">
@@ -735,10 +735,21 @@ function Detail({ charter, onBack, onBook }) {
         className="fixed bottom-0 left-0 right-0 px-6 py-4 flex items-center justify-between"
         style={{ background: COLORS.ink, borderTop: `1px solid ${COLORS.line}`, maxWidth: 480, margin: "0 auto" }}
       >
-        <PriceBlock price={charter.price} originalPrice={charter.originalPrice} />
-        <button onClick={onBook} className="px-6 py-3 rounded-full font-semibold text-sm" style={{ background: COLORS.rust, color: COLORS.paper }}>
-          Claim this seat
-        </button>
+        {charter.spotsLeft > 0 ? (
+          <>
+            <PriceBlock price={charter.price} originalPrice={charter.originalPrice} />
+            <button onClick={onBook} className="px-6 py-3 rounded-full font-semibold text-sm" style={{ background: COLORS.rust, color: COLORS.paper }}>
+              Claim this seat
+            </button>
+          </>
+        ) : (
+          <>
+            <span style={{ color: COLORS.paperDim, fontSize: 13 }}>Sold out</span>
+            <button onClick={onBook} className="px-6 py-3 rounded-full font-semibold text-sm" style={{ background: COLORS.teal, color: COLORS.ink }}>
+              Join waitlist
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -751,6 +762,7 @@ function Booking({ charter, onBack, onConfirm }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [spots, setSpots] = useState(1);
+  const isWaitlist = charter.spotsLeft <= 0;
   const valid = name.trim().length > 1 && email.includes("@");
 
   return (
@@ -758,34 +770,45 @@ function Booking({ charter, onBack, onConfirm }) {
       <button onClick={onBack} style={{ color: COLORS.paperDim, fontSize: 14 }} className="mb-4">
         ← Back
       </button>
-      <h1 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 24, fontWeight: 600 }}>Claim your seat</h1>
+      <h1 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 24, fontWeight: 600 }}>
+        {isWaitlist ? "Join the waitlist" : "Claim your seat"}
+      </h1>
       <div style={{ color: COLORS.paperDim, fontSize: 13, marginTop: 4 }}>
-        {charter.boat} · <CountdownLabel target={charter.departure} />
+        {charter.boat} · {isWaitlist ? "Sold out — we'll text you if a seat opens up" : <CountdownLabel target={charter.departure} />}
       </div>
 
       <div className="mt-6 flex flex-col gap-4">
         <Field label="NAME" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your full name" />
         <Field label="EMAIL" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@email.com" />
-        <label className="flex flex-col gap-1.5">
-          <span style={{ color: COLORS.paperDim, fontSize: 12, fontFamily: MONO }}>SEATS</span>
-          <div className="flex items-center gap-3">
-            <button onClick={() => setSpots((s) => Math.max(1, s - 1))} className="w-9 h-9 rounded-full" style={{ background: COLORS.inkSoft, color: COLORS.paper, border: `1px solid ${COLORS.line}` }}>
-              −
-            </button>
-            <span style={{ color: COLORS.paper, fontFamily: MONO, fontSize: 16 }}>{spots}</span>
-            <button onClick={() => setSpots((s) => Math.min(charter.spotsLeft, s + 1))} className="w-9 h-9 rounded-full" style={{ background: COLORS.inkSoft, color: COLORS.paper, border: `1px solid ${COLORS.line}` }}>
-              +
-            </button>
+        {!isWaitlist && (
+          <label className="flex flex-col gap-1.5">
+            <span style={{ color: COLORS.paperDim, fontSize: 12, fontFamily: MONO }}>SEATS</span>
+            <div className="flex items-center gap-3">
+              <button onClick={() => setSpots((s) => Math.max(1, s - 1))} className="w-9 h-9 rounded-full" style={{ background: COLORS.inkSoft, color: COLORS.paper, border: `1px solid ${COLORS.line}` }}>
+                −
+              </button>
+              <span style={{ color: COLORS.paper, fontFamily: MONO, fontSize: 16 }}>{spots}</span>
+              <button onClick={() => setSpots((s) => Math.min(charter.spotsLeft, s + 1))} className="w-9 h-9 rounded-full" style={{ background: COLORS.inkSoft, color: COLORS.paper, border: `1px solid ${COLORS.line}` }}>
+                +
+              </button>
+            </div>
+          </label>
+        )}
+
+        {isWaitlist ? (
+          <p style={{ color: COLORS.paperDim, fontSize: 12.5, lineHeight: 1.5 }}>
+            No charge to join the waitlist. If a seat opens up, you'll be the first one notified — first come,
+            first reeled.
+          </p>
+        ) : (
+          <div className="rounded-2xl p-4 mt-2 flex items-center justify-between" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
+            <span style={{ color: COLORS.paperDim, fontSize: 13 }}>Total ({spots} seat{spots > 1 ? "s" : ""})</span>
+            <span style={{ color: COLORS.paper, fontFamily: MONO, fontSize: 18, fontWeight: 500 }}>${charter.price * spots}</span>
           </div>
-        </label>
+        )}
 
-        <div className="rounded-2xl p-4 mt-2 flex items-center justify-between" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
-          <span style={{ color: COLORS.paperDim, fontSize: 13 }}>Total ({spots} seat{spots > 1 ? "s" : ""})</span>
-          <span style={{ color: COLORS.paper, fontFamily: MONO, fontSize: 18, fontWeight: 500 }}>${charter.price * spots}</span>
-        </div>
-
-        <PrimaryButton disabled={!valid} onClick={() => onConfirm({ name, email, spots })}>
-          Confirm booking
+        <PrimaryButton disabled={!valid} onClick={() => onConfirm({ name, email, spots: isWaitlist ? 0 : spots, waitlist: isWaitlist })}>
+          {isWaitlist ? "Join waitlist" : "Confirm booking"}
         </PrimaryButton>
       </div>
     </div>
@@ -810,10 +833,20 @@ function Confirmed({ charter, booking, onDone }) {
       <div className="w-16 h-16 rounded-full flex items-center justify-center mb-5" style={{ background: `${COLORS.teal}22`, border: `1px solid ${COLORS.teal}` }}>
         <span style={{ fontSize: 26 }}>🎣</span>
       </div>
-      <h1 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 24, fontWeight: 600 }}>Seat's yours, {booking.name.split(" ")[0]}.</h1>
+      <h1 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 24, fontWeight: 600 }}>
+        {booking.waitlist ? `You're on the list, ${booking.name.split(" ")[0]}.` : `Seat's yours, ${booking.name.split(" ")[0]}.`}
+      </h1>
       <p style={{ color: COLORS.paperDim, fontSize: 14, marginTop: 8, lineHeight: 1.6 }}>
-        {charter.captain} just got a text — you're confirmed for {booking.spots} seat{booking.spots > 1 ? "s" : ""} on the {charter.boat},
-        departing in <span style={{ color: COLORS.gold }}><CountdownLabel target={charter.departure} /></span>.
+        {booking.waitlist ? (
+          <>
+            We'll text you the second a seat opens up on the {charter.boat}. No charge unless you confirm.
+          </>
+        ) : (
+          <>
+            {charter.captain} just got a text — you're confirmed for {booking.spots} seat{booking.spots > 1 ? "s" : ""} on the {charter.boat},
+            departing in <span style={{ color: COLORS.gold }}><CountdownLabel target={charter.departure} /></span>.
+          </>
+        )}
       </p>
 
       <div className="w-full mt-8 rounded-2xl p-4 text-left" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
@@ -1014,18 +1047,20 @@ function SponsorClaim() {
   );
 }
 
-function PostCancellation({ onCreate, onClose }) {
-  const [kind, setKind] = useState("cancellation"); // "cancellation" or "open"
-  const [groupType, setGroupType] = useState("shared");
+function PostCancellation({ onSave, onClose, initialValues }) {
+  const isEdit = Boolean(initialValues);
+  const [kind, setKind] = useState(initialValues?.kind || "cancellation");
+  const [groupType, setGroupType] = useState(initialValues?.groupType || "shared");
   const [form, setForm] = useState({
-    species: "",
-    spots: "2",
-    price: "",
-    hours: "4",
-    date: "",
-    meetingPoint: "",
-    included: "",
-    licenseNote: "",
+    species: initialValues?.species || "",
+    spots: initialValues ? String(initialValues.spots) : "2",
+    price: initialValues ? String(initialValues.price) : "",
+    hours: initialValues?.hours ? String(initialValues.hours) : "4",
+    date: initialValues?.date || "",
+    meetingPoint: initialValues?.meetingPoint || "",
+    included: initialValues?.included?.join(", ") || "",
+    licenseNote: initialValues?.licenseNote || "",
+    notes: initialValues?.notes || "",
   });
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
   const valid = kind === "cancellation"
@@ -1039,7 +1074,9 @@ function PostCancellation({ onCreate, onClose }) {
         style={{ background: COLORS.ink, maxWidth: 480, border: `1px solid ${COLORS.line}`, borderBottom: "none", maxHeight: "88vh" }}
       >
         <div className="flex items-center justify-between mb-5">
-          <h2 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 19, fontWeight: 600 }}>Post a trip</h2>
+          <h2 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 19, fontWeight: 600 }}>
+            {isEdit ? "Edit trip" : "Post a trip"}
+          </h2>
           <button onClick={onClose} style={{ color: COLORS.paperDim, fontSize: 20 }}>×</button>
         </div>
 
@@ -1110,9 +1147,15 @@ function PostCancellation({ onCreate, onClose }) {
             onChange={set("licenseNote")}
             placeholder="e.g. No license needed — covered by the charter"
           />
+          <Field
+            label="NOTES FOR BOOKED ANGLERS (optional)"
+            value={form.notes}
+            onChange={set("notes")}
+            placeholder="e.g. Meet at the north dock, not the main one"
+          />
 
-          <PrimaryButton disabled={!valid} onClick={() => onCreate({ ...form, kind, groupType })}>
-            {kind === "cancellation" ? "Post to Last Cast" : "List this trip"}
+          <PrimaryButton disabled={!valid} onClick={() => onSave({ ...form, kind, groupType }, initialValues?.id)}>
+            {isEdit ? "Save changes" : kind === "cancellation" ? "Post to Last Cast" : "List this trip"}
           </PrimaryButton>
         </div>
       </div>
@@ -1123,12 +1166,46 @@ function PostCancellation({ onCreate, onClose }) {
 /* ---------------------------------------------------------------------
    CAPTAIN: DASHBOARD
 --------------------------------------------------------------------- */
+function listingWhen(l) {
+  if (l.kind === "open" && l.date) return new Date(l.date).getTime();
+  if (l.kind === "cancellation" && l.hours != null) return Date.now() + l.hours * 3600000;
+  return Infinity;
+}
+
 function CaptainDashboard({ captain, joinIndex, onExit }) {
-  const [listings, setListings] = useState([{ id: 1, kind: "cancellation", species: "Redfish, Trout", spots: 2, price: 90, hours: 3 }]);
+  const [listings, setListings] = useState([
+    { id: 1, kind: "cancellation", species: "Redfish, Trout", spots: 2, price: 90, hours: 3, notes: "" },
+  ]);
   const [showPost, setShowPost] = useState(false);
+  const [editingListing, setEditingListing] = useState(null);
+  const [repostSeed, setRepostSeed] = useState(null);
   const [sponsorInterest, setSponsorInterest] = useState(false);
 
   const stats = useMemo(() => ({ trips: 12, seatsFilled: 34, recovered: 3120 }), []);
+  const sortedListings = useMemo(() => [...listings].sort((a, b) => listingWhen(a) - listingWhen(b)), [listings]);
+
+  const closeForm = () => {
+    setShowPost(false);
+    setEditingListing(null);
+    setRepostSeed(null);
+  };
+
+  const buildListingFromForm = (form, id) => ({
+    id: id ?? Date.now(),
+    kind: form.kind,
+    species: form.species,
+    spots: Number(form.spots),
+    price: Number(form.price),
+    hours: form.kind === "cancellation" ? Number(form.hours) : null,
+    date: form.kind === "open" ? form.date : null,
+    meetingPoint: form.meetingPoint,
+    groupType: form.groupType,
+    included: form.included ? form.included.split(",").map((s) => s.trim()).filter(Boolean) : [],
+    licenseNote: form.licenseNote,
+    notes: form.notes,
+  });
+
+  const formOpen = showPost || editingListing || repostSeed;
 
   return (
     <div className="px-6 pt-6 pb-16">
@@ -1168,28 +1245,84 @@ function CaptainDashboard({ captain, joinIndex, onExit }) {
         + Post a trip
       </button>
 
+      {/* Recent activity — a preview of what real-time booking alerts will look like.
+          This list is static sample data; real notifications need the backend (Firebase) to exist. */}
+      <div className="mt-7">
+        <div className="flex items-center justify-between mb-2">
+          <h2 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 17, fontWeight: 600 }}>Recent activity</h2>
+          <span style={{ color: COLORS.paperDim, fontSize: 10.5, fontFamily: MONO }}>PREVIEW</span>
+        </div>
+        <div className="flex flex-col gap-2">
+          {[
+            { text: "Danielle R. booked 2 seats on Silver Reel", when: "2h ago" },
+            { text: "Tom W. left a 5★ review", when: "1d ago" },
+          ].map((a, i) => (
+            <div key={i} className="rounded-xl px-3.5 py-2.5 flex items-center justify-between" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
+              <span style={{ color: COLORS.paperDim, fontSize: 12.5 }}>{a.text}</span>
+              <span style={{ color: COLORS.paperDim, fontSize: 11, fontFamily: MONO, opacity: 0.7 }}>{a.when}</span>
+            </div>
+          ))}
+        </div>
+        <p style={{ color: COLORS.paperDim, fontSize: 11, marginTop: 6, opacity: 0.7, lineHeight: 1.4 }}>
+          Real booking alerts (email/text the moment a seat sells) go live once the backend is connected.
+        </p>
+      </div>
+
       <div className="mt-7">
         <h2 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 17, fontWeight: 600, marginBottom: 10 }}>Your active listings</h2>
-        {listings.length === 0 && (
+        <p style={{ color: COLORS.paperDim, fontSize: 11, marginTop: -6, marginBottom: 10, opacity: 0.7 }}>Sorted soonest first</p>
+        {sortedListings.length === 0 && (
           <p style={{ color: COLORS.paperDim, fontSize: 13 }}>Nothing posted right now — cancellations happen, seats don't have to sit empty.</p>
         )}
         <div className="flex flex-col gap-2">
-          {listings.map((l) => {
+          {sortedListings.map((l) => {
             const net = (l.price * (1 - tierFor(joinIndex).pct / 100)).toFixed(0);
             return (
-              <div key={l.id} className="rounded-2xl p-3.5 flex items-center justify-between" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <span style={{ color: COLORS.paper, fontSize: 14, fontWeight: 500 }}>{l.species}</span>
-                    <Tag tone={l.kind === "open" ? "teal" : "rust"}>{l.kind === "open" ? "Open Trip" : "Cancellation"}</Tag>
+              <div key={l.id} className="rounded-2xl p-3.5" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span style={{ color: COLORS.paper, fontSize: 14, fontWeight: 500 }}>{l.species}</span>
+                      <Tag tone={l.kind === "open" ? "teal" : "rust"}>{l.kind === "open" ? "Open Trip" : "Cancellation"}</Tag>
+                    </div>
+                    <div style={{ color: COLORS.paperDim, fontSize: 12, marginTop: 4 }}>
+                      {l.spots} seats · {l.kind === "open" ? `trip on ${l.date}` : `departs in ${l.hours}h`}
+                    </div>
+                    {l.notes && (
+                      <div style={{ color: COLORS.gold, fontSize: 11.5, marginTop: 4, fontStyle: "italic" }}>note: {l.notes}</div>
+                    )}
                   </div>
-                  <div style={{ color: COLORS.paperDim, fontSize: 12, marginTop: 4 }}>
-                    {l.spots} seats · {l.kind === "open" ? `trip on ${l.date}` : `departs in ${l.hours}h`}
+                  <div className="text-right">
+                    <div style={{ color: COLORS.paper, fontFamily: MONO, fontSize: 14 }}>${l.price}/seat</div>
+                    <div style={{ color: COLORS.gold, fontSize: 11, marginTop: 2 }}>you net ${net}</div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div style={{ color: COLORS.paper, fontFamily: MONO, fontSize: 14 }}>${l.price}/seat</div>
-                  <div style={{ color: COLORS.gold, fontSize: 11, marginTop: 2 }}>you net ${net}</div>
+                <div className="flex gap-2 mt-3 pt-3" style={{ borderTop: `1px solid ${COLORS.line}` }}>
+                  <button
+                    onClick={() => setEditingListing(l)}
+                    className="flex-1 py-1.5 rounded-full text-xs font-medium"
+                    style={{ border: `1px solid ${COLORS.line}`, color: COLORS.paperDim }}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => setRepostSeed(l)}
+                    className="flex-1 py-1.5 rounded-full text-xs font-medium"
+                    style={{ border: `1px solid ${COLORS.teal}`, color: COLORS.teal }}
+                  >
+                    Repost
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (window.confirm("Remove this listing? Anglers will no longer see it.")) {
+                        setListings((prev) => prev.filter((x) => x.id !== l.id));
+                      }
+                    }}
+                    className="flex-1 py-1.5 rounded-full text-xs font-medium"
+                    style={{ border: `1px solid ${COLORS.rust}`, color: COLORS.rust }}
+                  >
+                    Cancel
+                  </button>
                 </div>
               </div>
             );
@@ -1219,27 +1352,34 @@ function CaptainDashboard({ captain, joinIndex, onExit }) {
         )}
       </div>
 
-      {showPost && (
+      {/* Coming soon — honestly labeled, no fake data. These need Stripe/backend to be real. */}
+      <div className="mt-7 rounded-2xl p-4" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
+        <div style={{ color: COLORS.paperDim, fontSize: 12, fontFamily: MONO, letterSpacing: 0.5 }}>COMING SOON</div>
+        <div className="flex flex-col gap-2.5 mt-3">
+          {[
+            ["Payout history", "See exactly what you've earned and what's on the way, once real payments are live."],
+            ["Multi-boat support", "Run more than one boat? List and manage each separately."],
+            ["Captain referral program", "Bring another captain onto Last Cast, earn a fee break."],
+          ].map(([title, desc]) => (
+            <div key={title}>
+              <div style={{ color: COLORS.paper, fontSize: 13, fontWeight: 500 }}>{title}</div>
+              <div style={{ color: COLORS.paperDim, fontSize: 12, marginTop: 1, lineHeight: 1.4 }}>{desc}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {formOpen && (
         <PostCancellation
-          onClose={() => setShowPost(false)}
-          onCreate={(form) => {
-            setListings((prev) => [
-              ...prev,
-              {
-                id: Date.now(),
-                kind: form.kind,
-                species: form.species,
-                spots: Number(form.spots),
-                price: Number(form.price),
-                hours: form.kind === "cancellation" ? Number(form.hours) : null,
-                date: form.kind === "open" ? form.date : null,
-                meetingPoint: form.meetingPoint,
-                groupType: form.groupType,
-                included: form.included ? form.included.split(",").map((s) => s.trim()).filter(Boolean) : [],
-                licenseNote: form.licenseNote,
-              },
-            ]);
-            setShowPost(false);
+          onClose={closeForm}
+          initialValues={editingListing || (repostSeed ? { ...repostSeed, id: undefined } : null)}
+          onSave={(form, id) => {
+            if (editingListing) {
+              setListings((prev) => prev.map((x) => (x.id === id ? buildListingFromForm(form, id) : x)));
+            } else {
+              setListings((prev) => [...prev, buildListingFromForm(form)]);
+            }
+            closeForm();
           }}
         />
       )}
