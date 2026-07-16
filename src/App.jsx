@@ -230,6 +230,11 @@ const CAPTAINS_JOINED_SO_FAR = 41;
 // if the sponsor they claim is listed here — add real sponsors as deals close.
 const SPONSORS = [];
 
+// Founding Angler program: first 2,000 accounts get a badge + early access to
+// new deals — no fee discount, so it costs nothing ongoing.
+const ANGLER_FOUNDING_CAP = 2000;
+const ANGLERS_JOINED_SO_FAR = 1148; // sample count for demo purposes
+
 function tierFor(joinIndex) {
   if (joinIndex <= FOUNDING_CAP) return { pct: 5, label: "Founding Captain" };
   if (joinIndex <= NEXT_CAP) return { pct: 10, label: "Early Captain" };
@@ -381,6 +386,119 @@ function BrandMark({ small }) {
   );
 }
 
+function Toggle({ checked, onChange }) {
+  return (
+    <button
+      onClick={() => onChange(!checked)}
+      className="w-11 h-6 rounded-full flex-shrink-0 relative transition"
+      style={{ background: checked ? COLORS.teal : COLORS.line }}
+    >
+      <span
+        className="absolute top-0.5 w-5 h-5 rounded-full transition"
+        style={{ left: checked ? 22 : 2, background: COLORS.paper }}
+      />
+    </button>
+  );
+}
+
+/* ---------------------------------------------------------------------
+   SHARED: SETTINGS (used by both anglers and captains)
+--------------------------------------------------------------------- */
+function SettingsScreen({ title, fields, onSave, onLogout, onBack, onDeleteAccount, deleteLabel, showLicense, licenseFileName, onUploadLicense }) {
+  const [values, setValues] = useState(() => Object.fromEntries(fields.map((f) => [f.key, f.value || ""])));
+  const [emailUpdates, setEmailUpdates] = useState(true);
+  const [smsAlerts, setSmsAlerts] = useState(true);
+  const [saved, setSaved] = useState(false);
+  const set = (k) => (e) => {
+    setValues({ ...values, [k]: e.target.value });
+    setSaved(false);
+  };
+
+  return (
+    <div className="px-6 pt-6 pb-14">
+      <button onClick={onBack} style={{ color: COLORS.paperDim, fontSize: 14 }} className="mb-4">
+        ← Back
+      </button>
+      <Header title={title} />
+
+      <h3 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 15, fontWeight: 600, marginBottom: 10 }}>Profile</h3>
+      <div className="flex flex-col gap-4 mb-7">
+        {fields.map((f) => (
+          <Field key={f.key} label={f.label} value={values[f.key]} onChange={set(f.key)} />
+        ))}
+        <PrimaryButton
+          onClick={() => {
+            onSave(values);
+            setSaved(true);
+          }}
+        >
+          {saved ? "Saved ✓" : "Save changes"}
+        </PrimaryButton>
+      </div>
+
+      {showLicense && (
+        <>
+          <h3 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Fishing license</h3>
+          <p style={{ color: COLORS.paperDim, fontSize: 11.5, marginBottom: 10, lineHeight: 1.4 }}>
+            Optional — only needed where the charter's license note says you'll need your own. Have it on file so
+            there's nothing to dig up at the dock.
+          </p>
+          <div className="mb-7">
+            <div
+              className="rounded-2xl p-5 flex flex-col items-center justify-center text-center gap-2 cursor-pointer"
+              style={{ background: COLORS.inkSoft, border: `1.5px dashed ${COLORS.line}` }}
+              onClick={() => onUploadLicense("fishing_license_scan.pdf")}
+            >
+              <span style={{ fontSize: 20 }}>📄</span>
+              <span style={{ color: COLORS.paper, fontSize: 13.5, fontWeight: 500 }}>
+                {licenseFileName ? licenseFileName : "Tap to upload your license"}
+              </span>
+              <span style={{ color: COLORS.paperDim, fontSize: 11.5 }}>PDF or photo, under 10MB</span>
+              {licenseFileName && <span style={{ color: COLORS.teal, fontSize: 11.5, marginTop: 2 }}>✓ On file</span>}
+            </div>
+          </div>
+        </>
+      )}
+
+      <h3 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 15, fontWeight: 600, marginBottom: 10 }}>Notifications</h3>
+      <div className="flex flex-col gap-3 mb-7">
+        <div className="flex items-center justify-between rounded-2xl p-3.5" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
+          <div>
+            <div style={{ color: COLORS.paper, fontSize: 13.5 }}>Email updates</div>
+            <div style={{ color: COLORS.paperDim, fontSize: 11.5, marginTop: 1 }}>Booking confirmations and receipts</div>
+          </div>
+          <Toggle checked={emailUpdates} onChange={setEmailUpdates} />
+        </div>
+        <div className="flex items-center justify-between rounded-2xl p-3.5" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
+          <div>
+            <div style={{ color: COLORS.paper, fontSize: 13.5 }}>Text alerts</div>
+            <div style={{ color: COLORS.paperDim, fontSize: 11.5, marginTop: 1 }}>Last-minute deals and booking activity</div>
+          </div>
+          <Toggle checked={smsAlerts} onChange={setSmsAlerts} />
+        </div>
+        <p style={{ color: COLORS.paperDim, fontSize: 11, opacity: 0.7, lineHeight: 1.4 }}>
+          These preferences are saved on this device only — real delivery goes live once the backend is connected.
+        </p>
+      </div>
+
+      <button onClick={onLogout} className="w-full py-3 rounded-full text-sm font-medium mb-3" style={{ border: `1px solid ${COLORS.line}`, color: COLORS.paperDim }}>
+        Log out
+      </button>
+      {onDeleteAccount && (
+        <button
+          onClick={() => {
+            if (window.confirm("Delete your account? This can't be undone.")) onDeleteAccount();
+          }}
+          className="w-full py-3 rounded-full text-sm font-medium"
+          style={{ border: `1px solid ${COLORS.rust}`, color: COLORS.rust }}
+        >
+          {deleteLabel || "Delete account"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 /* ---------------------------------------------------------------------
    CUSTOMER: HOME
 --------------------------------------------------------------------- */
@@ -415,7 +533,7 @@ function BrowseListingCard({ c, onSelect }) {
   );
 }
 
-function Home({ onSelect, onCaptainPortal }) {
+function Home({ onSelect, onCaptainPortal, onAccount, angler }) {
   const [tab, setTab] = useState("deals"); // "deals" or "browse"
   const [category, setCategory] = useState("All");
   const [query, setQuery] = useState("");
@@ -439,13 +557,22 @@ function Home({ onSelect, onCaptainPortal }) {
       <div className="relative px-6 pt-8 pb-8" style={{ background: `radial-gradient(120% 100% at 20% 0%, #1c3540 0%, ${COLORS.ink} 60%)` }}>
         <div className="flex items-center justify-between mb-6">
           <BrandMark />
-          <button
-            onClick={onCaptainPortal}
-            className="px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5"
-            style={{ border: `1px solid ${COLORS.line}`, color: COLORS.paperDim }}
-          >
-            ⚓ Captain login
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onAccount}
+              className="px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5"
+              style={{ border: `1px solid ${COLORS.line}`, color: COLORS.paperDim }}
+            >
+              {angler ? `${angler.joinIndex <= ANGLER_FOUNDING_CAP ? "⭐ " : "👤 "}${angler.name.split(" ")[0]}` : "👤 Account"}
+            </button>
+            <button
+              onClick={onCaptainPortal}
+              className="px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5"
+              style={{ border: `1px solid ${COLORS.line}`, color: COLORS.paperDim }}
+            >
+              ⚓ Captain login
+            </button>
+          </div>
         </div>
 
         <h1 style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 38, lineHeight: 1.05, color: COLORS.paper, letterSpacing: -0.5 }}>
@@ -864,6 +991,246 @@ function Confirmed({ charter, booking, onDone }) {
 }
 
 /* ---------------------------------------------------------------------
+   ANGLER: LOGIN / REGISTER / ACCOUNT / TRIP HISTORY / MESSAGING
+--------------------------------------------------------------------- */
+function AnglerLogin({ onLogin, onNew, onBack }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const valid = email.includes("@") && password.length >= 4;
+  return (
+    <div className="px-6 pt-8 pb-10">
+      <button onClick={onBack} style={{ color: COLORS.paperDim, fontSize: 14 }} className="mb-6">
+        ← Back to app
+      </button>
+      <BrandMark />
+      <div className="mt-6">
+        <Header title="Your trips, in one place." sub="Log in to see past and upcoming charters, and message your captain." />
+      </div>
+      <div className="flex flex-col gap-4">
+        <Field label="EMAIL" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@email.com" />
+        <Field label="PASSWORD" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
+        <PrimaryButton disabled={!valid} onClick={() => onLogin({ email })}>Log in</PrimaryButton>
+        <button onClick={onNew} style={{ color: COLORS.teal, fontSize: 13, textAlign: "center" }} className="mt-1">
+          New here? Create an account →
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function AnglerRegister({ onCreate, onBack }) {
+  const [form, setForm] = useState({ firstName: "", lastName: "", phone: "", email: "", zip: "", password: "" });
+  const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+  const valid =
+    form.firstName.trim() &&
+    form.lastName.trim() &&
+    form.phone.trim().length >= 7 &&
+    form.email.includes("@") &&
+    /^\d{5}$/.test(form.zip.trim()) &&
+    form.password.length >= 4;
+
+  return (
+    <div className="px-6 pt-8 pb-10">
+      <button onClick={onBack} style={{ color: COLORS.paperDim, fontSize: 14 }} className="mb-4">← Back</button>
+      <Header title="Create your account" />
+      <div className="flex flex-col gap-4">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="FIRST NAME" value={form.firstName} onChange={set("firstName")} placeholder="Jamie" />
+          <Field label="LAST NAME" value={form.lastName} onChange={set("lastName")} placeholder="Rivera" />
+        </div>
+        <Field label="PHONE NUMBER" type="tel" value={form.phone} onChange={set("phone")} placeholder="(555) 123-4567" />
+        <Field label="EMAIL" type="email" value={form.email} onChange={set("email")} placeholder="you@email.com" />
+        <Field label="CURRENT ZIP CODE" value={form.zip} onChange={set("zip")} placeholder="33040" maxLength={5} />
+        <Field label="PASSWORD" type="password" value={form.password} onChange={set("password")} placeholder="••••••••" />
+        <PrimaryButton
+          disabled={!valid}
+          onClick={() =>
+            onCreate({
+              firstName: form.firstName.trim(),
+              lastName: form.lastName.trim(),
+              name: `${form.firstName.trim()} ${form.lastName.trim()}`,
+              phone: form.phone.trim(),
+              email: form.email.trim(),
+              zip: form.zip.trim(),
+            })
+          }
+        >
+          Create account
+        </PrimaryButton>
+      </div>
+    </div>
+  );
+}
+
+function TripCard({ b, onOpen }) {
+  return (
+    <button
+      onClick={() => onOpen(b)}
+      className="w-full text-left rounded-2xl p-3.5 flex items-center justify-between"
+      style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}
+    >
+      <div>
+        <div className="flex items-center gap-1.5">
+          <span style={{ color: COLORS.paper, fontSize: 14, fontWeight: 500 }}>{b.charter.boat}</span>
+          {b.waitlist && <Tag tone="teal">Waitlisted</Tag>}
+        </div>
+        <div style={{ color: COLORS.paperDim, fontSize: 12, marginTop: 3 }}>
+          {b.charter.captain} · {b.charter.location}
+        </div>
+        <div style={{ color: COLORS.paperDim, fontSize: 11.5, marginTop: 2, opacity: 0.8 }}>
+          {b.status === "upcoming" ? <CountdownLabel target={b.charter.departure} /> : formatDate(b.charter.departure)}
+        </div>
+      </div>
+      <span style={{ color: COLORS.paperDim, fontSize: 18 }}>›</span>
+    </button>
+  );
+}
+
+function AnglerAccount({ angler, bookings, onOpenTrip, onLogout, onBack, onSettings }) {
+  const upcoming = bookings.filter((b) => b.status === "upcoming");
+  const past = bookings.filter((b) => b.status === "past");
+
+  return (
+    <div className="px-6 pt-6 pb-16">
+      <div className="flex items-center justify-between mb-4">
+        <button onClick={onBack} style={{ color: COLORS.paperDim, fontSize: 14 }}>
+          ← Back to app
+        </button>
+        <button onClick={onSettings} style={{ color: COLORS.paperDim, fontSize: 18 }}>
+          ⚙
+        </button>
+      </div>
+
+      <div className="flex items-center justify-between mb-7">
+        <div>
+          <div style={{ color: COLORS.paperDim, fontSize: 12, fontFamily: MONO }}>YOUR ACCOUNT</div>
+          <h1 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 22, fontWeight: 600, marginTop: 2 }}>{angler.name}</h1>
+          <div style={{ color: COLORS.paperDim, fontSize: 13, marginTop: 1 }}>{angler.email}</div>
+        </div>
+        <div className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: COLORS.rust }}>
+          <span>👤</span>
+        </div>
+      </div>
+
+      {angler.joinIndex && <FoundingAnglerCard joinIndex={angler.joinIndex} />}
+
+      <h2 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 17, fontWeight: 600, marginBottom: 10 }}>Upcoming trips</h2>
+      <div className="flex flex-col gap-2 mb-7">
+        {upcoming.length === 0 && (
+          <p style={{ color: COLORS.paperDim, fontSize: 13 }}>No upcoming trips yet — go find a seat.</p>
+        )}
+        {upcoming.map((b) => (
+          <TripCard key={b.id} b={b} onOpen={onOpenTrip} />
+        ))}
+      </div>
+
+      <h2 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 17, fontWeight: 600, marginBottom: 10 }}>Past trips</h2>
+      <div className="flex flex-col gap-2">
+        {past.length === 0 && (
+          <p style={{ color: COLORS.paperDim, fontSize: 13 }}>Your completed trips will show up here.</p>
+        )}
+        {past.map((b) => (
+          <TripCard key={b.id} b={b} onOpen={onOpenTrip} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TripMessages({ booking, onBack, onSend }) {
+  const [draft, setDraft] = useState("");
+  const messages = booking.messages || [];
+
+  return (
+    <div className="px-6 pt-6 pb-10" style={{ minHeight: "100%", display: "flex", flexDirection: "column" }}>
+      <button onClick={onBack} style={{ color: COLORS.paperDim, fontSize: 14 }} className="mb-4">
+        ← Back to trip
+      </button>
+      <div className="flex items-center justify-between mb-1">
+        <h1 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 20, fontWeight: 600 }}>{booking.charter.captain}</h1>
+        <span style={{ color: COLORS.paperDim, fontSize: 10.5, fontFamily: MONO }}>PREVIEW</span>
+      </div>
+      <p style={{ color: COLORS.paperDim, fontSize: 12, marginBottom: 5 }}>
+        {booking.charter.boat} · {formatDate(booking.charter.departure)}
+      </p>
+      <p style={{ color: COLORS.paperDim, fontSize: 11, marginBottom: 5, opacity: 0.7, lineHeight: 1.4 }}>
+        Messages here stay on this device for now — real delivery to the captain goes live once the backend is connected.
+      </p>
+
+      <div className="flex-1 flex flex-col gap-2 mt-4 mb-4">
+        {messages.map((m, i) => (
+          <div
+            key={i}
+            className="max-w-[80%] rounded-2xl px-3.5 py-2.5"
+            style={{
+              alignSelf: m.from === "angler" ? "flex-end" : "flex-start",
+              background: m.from === "angler" ? COLORS.rust : COLORS.inkSoft,
+              border: m.from === "angler" ? "none" : `1px solid ${COLORS.line}`,
+              color: COLORS.paper,
+              fontSize: 13.5,
+            }}
+          >
+            {m.text}
+          </div>
+        ))}
+      </div>
+
+      <div className="flex items-center gap-2">
+        <input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="Message your captain..."
+          className="flex-1 rounded-full px-4 py-3 text-sm outline-none"
+          style={{ background: COLORS.paper, color: COLORS.ink }}
+        />
+        <button
+          disabled={!draft.trim()}
+          onClick={() => {
+            onSend(draft.trim());
+            setDraft("");
+          }}
+          className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0"
+          style={{ background: draft.trim() ? COLORS.rust : COLORS.line, color: COLORS.paper }}
+        >
+          →
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function TripDetail({ booking, onBack, onMessage }) {
+  const { charter, status } = booking;
+  return (
+    <div className="px-6 pt-6 pb-10">
+      <button onClick={onBack} style={{ color: COLORS.paperDim, fontSize: 14 }} className="mb-4">
+        ← Back to account
+      </button>
+      <Tag tone={status === "upcoming" ? "gold" : "teal"}>{status === "upcoming" ? "Upcoming" : "Completed"}</Tag>
+      <h1 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 24, fontWeight: 600, marginTop: 8 }}>{charter.boat}</h1>
+      <div style={{ color: COLORS.paperDim, fontSize: 14, marginTop: 2 }}>
+        {charter.captain} · {charter.location}
+      </div>
+
+      <div className="mt-5 rounded-2xl p-4" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
+        <Row label="Date" value={formatDate(charter.departure)} />
+        <Row label="Meeting point" value={charter.meetingPoint || charter.location} />
+        <Row label="Seats booked" value={booking.spots} />
+        <Row label="Total paid" value={`$${charter.price * (booking.spots || 1)}`} />
+      </div>
+
+      <button
+        onClick={() => onMessage(booking)}
+        className="w-full mt-5 py-3.5 rounded-full text-sm font-semibold flex items-center justify-center gap-2"
+        style={{ background: COLORS.teal, color: COLORS.ink }}
+      >
+        💬 Message {charter.captain.split(" ")[1] || "captain"}
+      </button>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------
    CAPTAIN: LOGIN / REGISTER / LICENSE / PENDING
 --------------------------------------------------------------------- */
 function CaptainLogin({ onLogin, onNew, onBackToApp, backLabel = "← Back to app" }) {
@@ -979,6 +1346,30 @@ function FeeTierCard({ joinIndex }) {
           Standard platform rate. Ask about sponsor-subsidized rates below.
         </p>
       )}
+    </div>
+  );
+}
+
+function FoundingAnglerCard({ joinIndex }) {
+  const isFounding = joinIndex <= ANGLER_FOUNDING_CAP;
+  const remaining = ANGLER_FOUNDING_CAP - joinIndex;
+  const pctFull = Math.min(1, joinIndex / ANGLER_FOUNDING_CAP);
+
+  if (!isFounding) return null;
+
+  return (
+    <div className="rounded-2xl p-4 mb-5" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.gold}55` }}>
+      <div className="flex items-center justify-between">
+        <span style={{ color: COLORS.gold, fontSize: 12, fontFamily: MONO, letterSpacing: 0.5 }}>⭐ FOUNDING ANGLER</span>
+        <span style={{ color: COLORS.paper, fontFamily: MONO, fontSize: 12 }}>#{joinIndex}</span>
+      </div>
+      <p style={{ color: COLORS.paperDim, fontSize: 12.5, marginTop: 6, lineHeight: 1.5 }}>
+        You're one of the first {ANGLER_FOUNDING_CAP.toLocaleString()} anglers on Last Cast — you get first look at
+        new deals before anyone else sees them. Only {remaining.toLocaleString()} founding spot{remaining !== 1 ? "s" : ""} left.
+      </p>
+      <div className="w-full h-1.5 rounded-full mt-3" style={{ background: COLORS.line }}>
+        <div className="h-1.5 rounded-full" style={{ width: `${pctFull * 100}%`, background: COLORS.gold }} />
+      </div>
     </div>
   );
 }
@@ -1172,7 +1563,7 @@ function listingWhen(l) {
   return Infinity;
 }
 
-function CaptainDashboard({ captain, joinIndex, onExit }) {
+function CaptainDashboard({ captain, joinIndex, onExit, onSettings }) {
   const [listings, setListings] = useState([
     { id: 1, kind: "cancellation", species: "Redfish, Trout", spots: 2, price: 90, hours: 3, notes: "" },
   ]);
@@ -1209,9 +1600,14 @@ function CaptainDashboard({ captain, joinIndex, onExit }) {
 
   return (
     <div className="px-6 pt-6 pb-16">
-      <button onClick={onExit} style={{ color: COLORS.paperDim, fontSize: 14 }} className="mb-4">
-        ← Back to app
-      </button>
+      <div className="flex items-center justify-between mb-4">
+        <button onClick={onExit} style={{ color: COLORS.paperDim, fontSize: 14 }}>
+          ← Back to app
+        </button>
+        <button onClick={onSettings} style={{ color: COLORS.paperDim, fontSize: 18 }}>
+          ⚙
+        </button>
+      </div>
 
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -1406,6 +1802,24 @@ export default function LastCastApp() {
   const [charter, setCharter] = useState(null);
   const [booking, setBooking] = useState(null);
 
+  // angler account state — separate from the guest-checkout booking flow above
+  const [angler, setAngler] = useState(null);
+  const [anglerBookings, setAnglerBookings] = useState([
+    {
+      id: "seed-1",
+      charter: CHARTERS[1],
+      spots: 2,
+      status: "past",
+      waitlist: false,
+      messages: [
+        { from: "captain", text: "Thanks for booking — see you at the dock!" },
+        { from: "angler", text: "Looking forward to it!" },
+      ],
+    },
+  ]);
+  const [activeTripId, setActiveTripId] = useState(null);
+  const activeTrip = anglerBookings.find((b) => b.id === activeTripId) || null;
+
   // captain-side view state — starts on login whether entered via the button or a direct link
   const [captainView, setCaptainView] = useState("login");
   const cameFromDirectLink = useMemo(() => wantsCaptainEntry(), []);
@@ -1419,6 +1833,9 @@ export default function LastCastApp() {
   const goBackToApp = () => {
     setSide("customer");
     setCustomerView("home");
+  };
+  const goAccount = () => {
+    setCustomerView(angler ? "account" : "anglerLogin");
   };
 
   return (
@@ -1434,6 +1851,8 @@ export default function LastCastApp() {
                   setCustomerView("detail");
                 }}
                 onCaptainPortal={goCaptainPortal}
+                onAccount={goAccount}
+                angler={angler}
               />
             )}
             {customerView === "detail" && charter && (
@@ -1446,6 +1865,19 @@ export default function LastCastApp() {
                 onConfirm={(b) => {
                   setBooking(b);
                   setCustomerView("confirmed");
+                  setAnglerBookings((prev) => [
+                    ...prev,
+                    {
+                      id: `b-${Date.now()}`,
+                      charter,
+                      spots: b.spots,
+                      status: "upcoming",
+                      waitlist: Boolean(b.waitlist),
+                      messages: b.waitlist
+                        ? []
+                        : [{ from: "captain", text: `Confirmed! Meet at ${charter.meetingPoint || charter.location}.` }],
+                    },
+                  ]);
                 }}
               />
             )}
@@ -1457,6 +1889,90 @@ export default function LastCastApp() {
                   setCustomerView("home");
                   setCharter(null);
                   setBooking(null);
+                }}
+              />
+            )}
+
+            {customerView === "anglerLogin" && (
+              <AnglerLogin
+                onBack={() => setCustomerView("home")}
+                onNew={() => setCustomerView("anglerRegister")}
+                onLogin={(a) => {
+                  setAngler({ name: a.email.split("@")[0], email: a.email, joinIndex: ANGLERS_JOINED_SO_FAR + 1 });
+                  setCustomerView("account");
+                }}
+              />
+            )}
+            {customerView === "anglerRegister" && (
+              <AnglerRegister
+                onBack={() => setCustomerView("anglerLogin")}
+                onCreate={(a) => {
+                  setAngler({ ...a, joinIndex: ANGLERS_JOINED_SO_FAR + 1 });
+                  setCustomerView("account");
+                }}
+              />
+            )}
+            {customerView === "account" && angler && (
+              <AnglerAccount
+                angler={angler}
+                bookings={anglerBookings}
+                onBack={() => setCustomerView("home")}
+                onLogout={() => {
+                  setAngler(null);
+                  setCustomerView("home");
+                }}
+                onOpenTrip={(b) => {
+                  setActiveTripId(b.id);
+                  setCustomerView("tripDetail");
+                }}
+                onSettings={() => setCustomerView("anglerSettings")}
+              />
+            )}
+            {customerView === "anglerSettings" && angler && (
+              <SettingsScreen
+                title="Account settings"
+                fields={[
+                  { key: "firstName", label: "FIRST NAME", value: angler.firstName },
+                  { key: "lastName", label: "LAST NAME", value: angler.lastName },
+                  { key: "phone", label: "PHONE NUMBER", value: angler.phone },
+                  { key: "email", label: "EMAIL", value: angler.email },
+                  { key: "zip", label: "CURRENT ZIP CODE", value: angler.zip },
+                ]}
+                onBack={() => setCustomerView("account")}
+                onSave={(values) =>
+                  setAngler({ ...angler, ...values, name: `${values.firstName} ${values.lastName}` })
+                }
+                onLogout={() => {
+                  setAngler(null);
+                  setCustomerView("home");
+                }}
+                onDeleteAccount={() => {
+                  setAngler(null);
+                  setAnglerBookings([]);
+                  setCustomerView("home");
+                }}
+                showLicense
+                licenseFileName={angler.licenseFileName}
+                onUploadLicense={(fileName) => setAngler({ ...angler, licenseFileName: fileName })}
+              />
+            )}
+            {customerView === "tripDetail" && activeTrip && (
+              <TripDetail
+                booking={activeTrip}
+                onBack={() => setCustomerView("account")}
+                onMessage={() => setCustomerView("tripMessages")}
+              />
+            )}
+            {customerView === "tripMessages" && activeTrip && (
+              <TripMessages
+                booking={activeTrip}
+                onBack={() => setCustomerView("tripDetail")}
+                onSend={(text) => {
+                  setAnglerBookings((prev) =>
+                    prev.map((b) =>
+                      b.id === activeTrip.id ? { ...b, messages: [...(b.messages || []), { from: "angler", text }] } : b
+                    )
+                  );
                 }}
               />
             )}
@@ -1487,7 +2003,34 @@ export default function LastCastApp() {
             )}
             {captainView === "pending" && <CaptainPending onApprove={() => setCaptainView("dashboard")} />}
             {captainView === "dashboard" && (
-              <CaptainDashboard captain={captain} joinIndex={joinIndex} onExit={goBackToApp} />
+              <CaptainDashboard
+                captain={captain}
+                joinIndex={joinIndex}
+                onExit={goBackToApp}
+                onSettings={() => setCaptainView("settings")}
+              />
+            )}
+            {captainView === "settings" && (
+              <SettingsScreen
+                title="Captain settings"
+                fields={[
+                  { key: "name", label: "YOUR NAME", value: captain.name },
+                  { key: "boat", label: "BOAT NAME", value: captain.boat },
+                  { key: "location", label: "HOME PORT / LOCATION", value: captain.location },
+                  { key: "species", label: "SPECIALTIES", value: captain.species },
+                ]}
+                onBack={() => setCaptainView("dashboard")}
+                onSave={(values) => setCaptain({ ...captain, ...values })}
+                onLogout={() => {
+                  setCaptain({});
+                  setCaptainView("login");
+                }}
+                onDeleteAccount={() => {
+                  setCaptain({});
+                  setCaptainView("login");
+                }}
+                deleteLabel="Delete captain account"
+              />
             )}
           </>
         )}
