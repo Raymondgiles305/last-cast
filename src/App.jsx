@@ -350,6 +350,51 @@ function CountdownLabel({ target }) {
   );
 }
 
+function initials(name) {
+  const clean = (name || "").replace(/^capt\.?\s*/i, "").trim();
+  const parts = clean.split(/\s+/).filter(Boolean);
+  return (parts[0]?.[0] || "") + (parts[1]?.[0] || "");
+}
+
+function normalizeCaptainName(name) {
+  return (name || "").replace(/^capt\.?\s*/i, "").trim().toLowerCase();
+}
+
+const AVATAR_PALETTE = [COLORS.rust, COLORS.teal, COLORS.gold, "#5C7C8A", "#8A5C6F"];
+function avatarColorFor(name) {
+  let hash = 0;
+  for (let i = 0; i < (name || "").length; i++) hash = (hash * 31 + name.charCodeAt(i)) % AVATAR_PALETTE.length;
+  return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length];
+}
+
+// Shows the charter's captain persistently across every customer-facing page
+// for that charter. Uses a real uploaded photo when one exists on the captain
+// object (photoUrl); otherwise falls back to an initials avatar. Sample
+// listings don't carry a real photo yet since captain accounts and listings
+// aren't connected to a shared backend — this will pick up the real photo
+// automatically once they are.
+function CaptainStrip({ charter }) {
+  const photoUrl = charter.captainPhoto || null;
+  return (
+    <div className="flex items-center gap-2.5 px-6 py-3" style={{ background: COLORS.inkSoft, borderBottom: `1px solid ${COLORS.line}` }}>
+      <div
+        className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden"
+        style={{ background: avatarColorFor(charter.captain) }}
+      >
+        {photoUrl ? (
+          <img src={photoUrl} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.ink, fontFamily: MONO }}>{initials(charter.captain)}</span>
+        )}
+      </div>
+      <div className="min-w-0">
+        <div className="truncate" style={{ color: COLORS.paper, fontSize: 12.5, fontWeight: 500 }}>{charter.captain}</div>
+        <div className="truncate" style={{ color: COLORS.paperDim, fontSize: 10.5 }}>{charter.boat}</div>
+      </div>
+    </div>
+  );
+}
+
 /* ---------------------------------------------------------------------
    SHARED BITS
 --------------------------------------------------------------------- */
@@ -941,6 +986,7 @@ function Detail({ charter, onBack, onBook }) {
           </div>
         )}
       </div>
+      <CaptainStrip charter={charter} />
 
       <div className="px-6 pt-5 pb-28">
         <h1 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 26, fontWeight: 600 }}>{charter.boat}</h1>
@@ -1117,7 +1163,9 @@ function Booking({ charter, angler, onBack, onNext }) {
   const licenseRequired = Boolean(charter.licenseNote) && !/no .*license needed/i.test(charter.licenseNote || "");
 
   return (
-    <div style={{ background: COLORS.ink, minHeight: "100%" }} className="px-6 pt-6 pb-10">
+    <div style={{ background: COLORS.ink, minHeight: "100%" }}>
+      <CaptainStrip charter={charter} />
+      <div className="px-6 pt-6 pb-10">
       <button onClick={onBack} style={{ color: COLORS.paperDim, fontSize: 14 }} className="mb-4">
         ← Back
       </button>
@@ -1197,6 +1245,7 @@ function Booking({ charter, angler, onBack, onNext }) {
           {isWaitlist ? "Join waitlist" : "Review booking"}
         </PrimaryButton>
       </div>
+      </div>
     </div>
   );
 }
@@ -1218,7 +1267,9 @@ function ReviewBooking({ charter, draft, angler, onBack, onConfirm }) {
   const total = isPrivate ? charter.totalPrice : charter.price * draft.spots;
 
   return (
-    <div style={{ background: COLORS.ink, minHeight: "100%" }} className="px-6 pt-6 pb-28">
+    <div style={{ background: COLORS.ink, minHeight: "100%" }}>
+      <CaptainStrip charter={charter} />
+      <div className="px-6 pt-6 pb-28">
       <button onClick={onBack} style={{ color: COLORS.paperDim, fontSize: 14 }} className="mb-4">
         ← Back
       </button>
@@ -1301,13 +1352,16 @@ function ReviewBooking({ charter, draft, angler, onBack, onConfirm }) {
           Confirm booking
         </button>
       </div>
+      </div>
     </div>
   );
 }
 
 function Confirmed({ charter, booking, onDone }) {
   return (
-    <div className="flex flex-col items-center justify-center text-center px-8" style={{ background: COLORS.ink, minHeight: "100%", paddingTop: 80, paddingBottom: 80 }}>
+    <div style={{ background: COLORS.ink, minHeight: "100%" }}>
+      <CaptainStrip charter={charter} />
+      <div className="flex flex-col items-center justify-center text-center px-8" style={{ paddingTop: 56, paddingBottom: 80 }}>
       <div className="w-16 h-16 rounded-full flex items-center justify-center mb-5" style={{ background: `${COLORS.teal}22`, border: `1px solid ${COLORS.teal}` }}>
         <span style={{ fontSize: 26 }}>🎣</span>
       </div>
@@ -1346,6 +1400,7 @@ function Confirmed({ charter, booking, onDone }) {
       <button onClick={onDone} className="mt-8 px-6 py-3 rounded-full font-semibold text-sm" style={{ background: COLORS.rust, color: COLORS.paper }}>
         Back to open seats
       </button>
+      </div>
     </div>
   );
 }
@@ -1972,7 +2027,7 @@ function listingWhen(l) {
   return Infinity;
 }
 
-function CaptainDashboard({ captain, joinIndex, onExit, onSettings }) {
+function CaptainDashboard({ captain, joinIndex, bookings, onExit, onSettings }) {
   const [listings, setListings] = useState([
     { id: 1, kind: "cancellation", species: "Redfish, Trout", spots: 2, price: 90, hours: 3, notes: "" },
   ]);
@@ -1983,6 +2038,10 @@ function CaptainDashboard({ captain, joinIndex, onExit, onSettings }) {
 
   const stats = useMemo(() => ({ trips: 12, seatsFilled: 34, recovered: 3120 }), []);
   const sortedListings = useMemo(() => [...listings].sort((a, b) => listingWhen(a) - listingWhen(b)), [listings]);
+  const myPassengers = useMemo(
+    () => (bookings || []).filter((b) => normalizeCaptainName(b.charter?.captain) === normalizeCaptainName(captain.name)),
+    [bookings, captain.name]
+  );
 
   const closeForm = () => {
     setShowPost(false);
@@ -2040,6 +2099,44 @@ function CaptainDashboard({ captain, joinIndex, onExit, onSettings }) {
             <div style={{ color: COLORS.paperDim, fontSize: 10.5, marginTop: 2 }}>{label}</div>
           </div>
         ))}
+      </div>
+
+      <div className="mt-7">
+        <h2 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 17, fontWeight: 600, marginBottom: 4 }}>Booked passengers</h2>
+        <p style={{ color: COLORS.paperDim, fontSize: 11.5, marginBottom: 10, lineHeight: 1.4, opacity: 0.85 }}>
+          Everyone who's booked a trip under your captain name — so you know who you're looking for at the dock.
+        </p>
+        {myPassengers.length === 0 && (
+          <p style={{ color: COLORS.paperDim, fontSize: 13 }}>
+            No passengers yet — once someone books a trip under your captain name, they'll show up here with their
+            photo.
+          </p>
+        )}
+        <div className="flex flex-col gap-2">
+          {myPassengers.map((b) => (
+            <div key={b.id} className="flex items-center gap-3 rounded-2xl p-3" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
+              <div
+                className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden"
+                style={{ background: avatarColorFor(b.name) }}
+              >
+                {b.photoUrl ? (
+                  <img src={b.photoUrl} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.ink, fontFamily: MONO }}>{initials(b.name)}</span>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="truncate" style={{ color: COLORS.paper, fontSize: 14, fontWeight: 500 }}>{b.name}</span>
+                  {b.waitlist && <Tag tone="teal">Waitlisted</Tag>}
+                </div>
+                <div className="truncate" style={{ color: COLORS.paperDim, fontSize: 11.5, marginTop: 1 }}>
+                  {b.charter.boat} · {b.spots} {b.charter.saleType === "private" ? "guests" : "seats"} · {formatDateTime(b.charter.departure)}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       <button
@@ -2227,6 +2324,9 @@ export default function LastCastApp() {
       spots: 2,
       status: "past",
       waitlist: false,
+      name: "Danielle Reyes",
+      email: "danielle@example.com",
+      photoUrl: null,
       messages: [
         { from: "captain", text: "Thanks for booking — see you at the dock!" },
         { from: "angler", text: "Looking forward to it!" },
@@ -2265,6 +2365,9 @@ export default function LastCastApp() {
         spots: draft.spots,
         status: "upcoming",
         waitlist: Boolean(draft.waitlist),
+        name: draft.name,
+        email: draft.email,
+        photoUrl: angler?.photoUrl || null,
         messages: draft.waitlist
           ? []
           : [{ from: "captain", text: `Confirmed! Meet at ${charter.meetingPoint || charter.location}.` }],
@@ -2445,6 +2548,7 @@ export default function LastCastApp() {
               <CaptainDashboard
                 captain={captain}
                 joinIndex={joinIndex}
+                bookings={anglerBookings}
                 onExit={goBackToApp}
                 onSettings={() => setCaptainView("settings")}
               />
