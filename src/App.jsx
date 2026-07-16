@@ -285,6 +285,15 @@ const PRIVATE_CHARTERS = [
 // like matching a captain to their reviews regardless of listing type.
 const ALL_CHARTERS = [...CHARTERS, ...STANDARD_CHARTERS, ...PRIVATE_CHARTERS];
 
+// Simulated photo gallery. There's no real photo upload for trip images yet
+// (that's tied to the captain photo-moderation feature, still pending), so
+// this generates a few angle variants of the existing abstract art per
+// charter — a real swipeable gallery UX, honestly not real photos.
+function galleryFor(charter) {
+  const base = charter.img;
+  return [base, base.replace("135deg", "110deg"), base.replace("135deg", "160deg")];
+}
+
 const CATEGORIES = [
   { key: "All", icon: "⚓" },
   { key: "Offshore", icon: "🌊" },
@@ -412,6 +421,44 @@ function CaptainStrip({ charter }) {
         <div className="truncate" style={{ color: COLORS.paper, fontSize: 12.5, fontWeight: 500 }}>{charter.captain}</div>
         <div className="truncate" style={{ color: COLORS.paperDim, fontSize: 10.5 }}>{charter.boat}</div>
       </div>
+    </div>
+  );
+}
+
+function PhotoGallery({ images, height = 224 }) {
+  const [index, setIndex] = useState(0);
+  const scrollerRef = useRef(null);
+
+  const handleScroll = () => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const i = Math.round(el.scrollLeft / el.clientWidth);
+    setIndex(i);
+  };
+
+  return (
+    <div className="relative" style={{ height }}>
+      <div
+        ref={scrollerRef}
+        onScroll={handleScroll}
+        className="flex overflow-x-auto snap-x snap-mandatory h-full"
+        style={{ scrollbarWidth: "none" }}
+      >
+        {images.map((bg, i) => (
+          <div key={i} className="w-full flex-shrink-0 snap-start" style={{ background: bg, height }} />
+        ))}
+      </div>
+      {images.length > 1 && (
+        <div className="absolute bottom-3 left-0 right-0 flex items-center justify-center gap-1.5">
+          {images.map((_, i) => (
+            <span
+              key={i}
+              className="rounded-full"
+              style={{ width: i === index ? 16 : 6, height: 6, background: i === index ? COLORS.paper : "rgba(245,241,230,0.4)", transition: "width 0.2s" }}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -792,14 +839,33 @@ function SettingsScreen({ title, fields, onSave, onLogout, onBack, onDeleteAccou
 /* ---------------------------------------------------------------------
    CUSTOMER: HOME
 --------------------------------------------------------------------- */
-function BrowseListingCard({ c, onSelect }) {
+function FavHeart({ active, onToggle, size = 15 }) {
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggle();
+      }}
+      className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+      style={{ background: "rgba(14,27,34,0.55)" }}
+    >
+      <span style={{ color: active ? COLORS.rust : COLORS.paper, fontSize: size }}>{active ? "♥" : "♡"}</span>
+    </button>
+  );
+}
+
+function BrowseListingCard({ c, onSelect, isFavorited, onToggleFavorite }) {
   return (
     <button
       onClick={() => onSelect(c)}
       className="flex gap-3 rounded-2xl p-3 text-left items-center"
       style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}
     >
-      <div className="w-20 h-20 rounded-xl flex-shrink-0" style={{ background: c.img }} />
+      <div className="w-20 h-20 rounded-xl flex-shrink-0 relative" style={{ background: c.img }}>
+        <div className="absolute top-1.5 right-1.5">
+          <FavHeart active={isFavorited} onToggle={onToggleFavorite} />
+        </div>
+      </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span style={{ color: COLORS.paper, fontWeight: 600, fontSize: 14 }}>{c.boat}</span>
@@ -823,7 +889,7 @@ function BrowseListingCard({ c, onSelect }) {
   );
 }
 
-function PrivateCharterCard({ c, onSelect }) {
+function PrivateCharterCard({ c, onSelect, isFavorited, onToggleFavorite }) {
   return (
     <button
       onClick={() => onSelect(c)}
@@ -831,7 +897,11 @@ function PrivateCharterCard({ c, onSelect }) {
       style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}
     >
       <div className="flex gap-3">
-        <div className="w-16 h-16 rounded-xl flex-shrink-0" style={{ background: c.img }} />
+        <div className="w-16 h-16 rounded-xl flex-shrink-0 relative" style={{ background: c.img }}>
+          <div className="absolute top-1 right-1">
+            <FavHeart active={isFavorited} onToggle={onToggleFavorite} size={13} />
+          </div>
+        </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <span className="truncate" style={{ color: COLORS.paper, fontWeight: 600, fontSize: 14 }}>{c.boat}</span>
@@ -859,13 +929,18 @@ function PrivateCharterCard({ c, onSelect }) {
   );
 }
 
-function Home({ onSelect, onCaptainPortal, onAccount, angler }) {
-  const [tab, setTab] = useState("deals"); // "deals" or "browse"
+function Home({ onSelect, onCaptainPortal, onAccount, angler, favoriteIds, onToggleFavorite }) {
+  const [tab, setTab] = useState("deals"); // "deals" | "browse" | "private" | "saved"
   const [category, setCategory] = useState("All");
   const [query, setQuery] = useState("");
   const [nearMe, setNearMe] = useState(false);
+  const [sortMode, setSortMode] = useState("default"); // "default" | "priceLow" | "priceHigh"
 
-  const source = tab === "deals" ? CHARTERS : tab === "browse" ? STANDARD_CHARTERS : PRIVATE_CHARTERS;
+  const source =
+    tab === "deals" ? CHARTERS
+    : tab === "browse" ? STANDARD_CHARTERS
+    : tab === "private" ? PRIVATE_CHARTERS
+    : ALL_CHARTERS.filter((c) => favoriteIds.includes(c.id));
 
   const filtered = useMemo(() => {
     return source.filter((c) => {
@@ -877,12 +952,19 @@ function Home({ onSelect, onCaptainPortal, onAccount, angler }) {
     });
   }, [source, category, query]);
 
+  const priceOf = (c) => (c.saleType === "private" ? c.totalPrice : c.price);
+
   const sortedFiltered = useMemo(() => {
-    if (!nearMe || !angler?.zip) return filtered;
-    return [...filtered].sort(
-      (a, b) => Math.abs(Number(a.zip) - Number(angler.zip)) - Math.abs(Number(b.zip) - Number(angler.zip))
-    );
-  }, [filtered, nearMe, angler?.zip]);
+    let list = filtered;
+    if (nearMe && angler?.zip) {
+      list = [...list].sort(
+        (a, b) => Math.abs(Number(a.zip) - Number(angler.zip)) - Math.abs(Number(b.zip) - Number(angler.zip))
+      );
+    }
+    if (sortMode === "priceLow") list = [...list].sort((a, b) => priceOf(a) - priceOf(b));
+    if (sortMode === "priceHigh") list = [...list].sort((a, b) => priceOf(b) - priceOf(a));
+    return list;
+  }, [filtered, nearMe, angler?.zip, sortMode]);
 
   const urgentDeals = [...filtered].sort((a, b) => a.departure - b.departure).slice(0, 3);
 
@@ -938,19 +1020,24 @@ function Home({ onSelect, onCaptainPortal, onAccount, angler }) {
           />
         </div>
 
-        <div className="flex mt-5 rounded-full p-1" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
+        <div className="flex gap-1.5 mt-5 overflow-x-auto pb-0.5">
           {[
             { key: "deals", label: "⏱ Deals" },
             { key: "browse", label: "Browse" },
             { key: "private", label: "Private" },
+            { key: "saved", label: `♥ Saved${favoriteIds.length ? ` (${favoriteIds.length})` : ""}` },
           ].map((t) => {
             const active = tab === t.key;
             return (
               <button
                 key={t.key}
                 onClick={() => setTab(t.key)}
-                className="flex-1 py-2 rounded-full text-sm font-medium transition"
-                style={{ background: active ? COLORS.rust : "transparent", color: active ? COLORS.paper : COLORS.paperDim }}
+                className="px-3.5 py-2 rounded-full text-sm font-medium whitespace-nowrap transition"
+                style={{
+                  background: active ? COLORS.rust : COLORS.inkSoft,
+                  border: `1px solid ${active ? COLORS.rust : COLORS.line}`,
+                  color: active ? COLORS.paper : COLORS.paperDim,
+                }}
               >
                 {t.label}
               </button>
@@ -979,19 +1066,31 @@ function Home({ onSelect, onCaptainPortal, onAccount, angler }) {
           })}
         </div>
 
-        {angler?.zip && (
-          <button
-            onClick={() => setNearMe((v) => !v)}
-            className="mt-3 px-3.5 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5"
-            style={{
-              background: nearMe ? COLORS.teal : "transparent",
-              border: `1px solid ${nearMe ? COLORS.teal : COLORS.line}`,
-              color: nearMe ? COLORS.ink : COLORS.paperDim,
-            }}
+        <div className="flex items-center gap-2 mt-3 flex-wrap">
+          {angler?.zip && (
+            <button
+              onClick={() => setNearMe((v) => !v)}
+              className="px-3.5 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5"
+              style={{
+                background: nearMe ? COLORS.teal : "transparent",
+                border: `1px solid ${nearMe ? COLORS.teal : COLORS.line}`,
+                color: nearMe ? COLORS.ink : COLORS.paperDim,
+              }}
+            >
+              📍 {nearMe ? "Sorted near you" : "Sort near me"}
+            </button>
+          )}
+          <select
+            value={sortMode}
+            onChange={(e) => setSortMode(e.target.value)}
+            className="px-3 py-1.5 rounded-full text-xs font-medium outline-none"
+            style={{ background: "transparent", border: `1px solid ${COLORS.line}`, color: COLORS.paperDim }}
           >
-            📍 {nearMe ? "Sorted near you" : "Sort near me"}
-          </button>
-        )}
+            <option value="default" style={{ color: COLORS.ink }}>Sort: Default</option>
+            <option value="priceLow" style={{ color: COLORS.ink }}>Price: Low to High</option>
+            <option value="priceHigh" style={{ color: COLORS.ink }}>Price: High to Low</option>
+          </select>
+        </div>
       </div>
 
       {tab === "deals" && (
@@ -1040,7 +1139,7 @@ function Home({ onSelect, onCaptainPortal, onAccount, angler }) {
 
       <div className="px-6 pt-2 pb-10" style={{ background: COLORS.ink }}>
         <h2 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 19, fontWeight: 600, marginBottom: 12 }}>
-          {tab === "deals" ? "All open seats" : tab === "browse" ? "Upcoming charters" : "Whole-boat charters"}
+          {tab === "deals" ? "All open seats" : tab === "browse" ? "Upcoming charters" : tab === "private" ? "Whole-boat charters" : "Your saved charters"}
         </h2>
         <div className="flex flex-col gap-3">
           {sortedFiltered.length === 0 && (
@@ -1049,7 +1148,9 @@ function Home({ onSelect, onCaptainPortal, onAccount, angler }) {
                 ? "No open seats match that search right now — try another spot or species."
                 : tab === "browse"
                 ? "No upcoming charters match that search — try another spot or species."
-                : "No private charters match that search — try another spot or species."}
+                : tab === "private"
+                ? "No private charters match that search — try another spot or species."
+                : "Nothing saved yet — tap the ♥ on any charter to add it here."}
             </div>
           )}
           {tab === "deals" &&
@@ -1060,7 +1161,11 @@ function Home({ onSelect, onCaptainPortal, onAccount, angler }) {
                 className="flex gap-3 rounded-2xl p-3 text-left items-center"
                 style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}
               >
-                <div className="w-20 h-20 rounded-xl flex-shrink-0" style={{ background: c.img }} />
+                <div className="w-20 h-20 rounded-xl flex-shrink-0 relative" style={{ background: c.img }}>
+                  <div className="absolute top-1.5 right-1.5">
+                    <FavHeart active={favoriteIds.includes(c.id)} onToggle={() => onToggleFavorite(c.id)} />
+                  </div>
+                </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span style={{ color: COLORS.paper, fontWeight: 600, fontSize: 14 }}>{c.boat}</span>
@@ -1087,8 +1192,22 @@ function Home({ onSelect, onCaptainPortal, onAccount, angler }) {
                 </div>
               </button>
             ))}
-          {tab === "browse" && sortedFiltered.map((c) => <BrowseListingCard key={c.id} c={c} onSelect={onSelect} />)}
-          {tab === "private" && sortedFiltered.map((c) => <PrivateCharterCard key={c.id} c={c} onSelect={onSelect} />)}
+          {tab === "browse" &&
+            sortedFiltered.map((c) => (
+              <BrowseListingCard key={c.id} c={c} onSelect={onSelect} isFavorited={favoriteIds.includes(c.id)} onToggleFavorite={() => onToggleFavorite(c.id)} />
+            ))}
+          {tab === "private" &&
+            sortedFiltered.map((c) => (
+              <PrivateCharterCard key={c.id} c={c} onSelect={onSelect} isFavorited={favoriteIds.includes(c.id)} onToggleFavorite={() => onToggleFavorite(c.id)} />
+            ))}
+          {tab === "saved" &&
+            sortedFiltered.map((c) =>
+              c.saleType === "private" ? (
+                <PrivateCharterCard key={c.id} c={c} onSelect={onSelect} isFavorited onToggleFavorite={() => onToggleFavorite(c.id)} />
+              ) : (
+                <BrowseListingCard key={c.id} c={c} onSelect={onSelect} isFavorited onToggleFavorite={() => onToggleFavorite(c.id)} />
+              )
+            )}
         </div>
       </div>
     </div>
@@ -1098,12 +1217,18 @@ function Home({ onSelect, onCaptainPortal, onAccount, angler }) {
 /* ---------------------------------------------------------------------
    CUSTOMER: DETAIL
 --------------------------------------------------------------------- */
-function Detail({ charter, onBack, onBook, onViewReviews, extraReviews }) {
+function Detail({ charter, onBack, onBook, onViewReviews, extraReviews, isFavorited, onToggleFavorite }) {
   const allReviews = reviewsFor(charter, extraReviews);
   const reviewCount = allReviews.length;
+  const [selectedDeparture, setSelectedDeparture] = useState(charter.departure);
+  const hasCalendar = !charter.reason; // deals are single-instance urgent slots, no calendar needed
+  const dateOptions = hasCalendar
+    ? [0, 7, 14, 21].map((d) => new Date(charter.departure.getTime() + d * 24 * 60 * 60 * 1000))
+    : [];
   return (
     <div style={{ background: COLORS.ink, minHeight: "100%" }}>
-      <div className="h-56 relative" style={{ background: charter.img }}>
+      <div className="relative">
+        <PhotoGallery images={galleryFor(charter)} height={224} />
         <button
           onClick={onBack}
           className="absolute top-4 left-4 w-9 h-9 rounded-full flex items-center justify-center"
@@ -1111,8 +1236,15 @@ function Detail({ charter, onBack, onBook, onViewReviews, extraReviews }) {
         >
           ←
         </button>
+        <button
+          onClick={onToggleFavorite}
+          className="absolute top-4 right-4 w-9 h-9 rounded-full flex items-center justify-center"
+          style={{ background: "rgba(14,27,34,0.6)", backdropFilter: "blur(4px)" }}
+        >
+          <span style={{ color: isFavorited ? COLORS.rust : COLORS.paper, fontSize: 16 }}>{isFavorited ? "♥" : "♡"}</span>
+        </button>
         {charter.reason && (
-          <div className="absolute bottom-3 left-4">
+          <div className="absolute top-4 left-16">
             <Tag tone="rust">{charter.reason}</Tag>
           </div>
         )}
@@ -1167,12 +1299,37 @@ function Detail({ charter, onBack, onBook, onViewReviews, extraReviews }) {
               </>
             ) : (
               <div style={{ color: COLORS.paper, fontSize: 15, fontWeight: 600, marginTop: 2 }}>
-                {formatDateTime(charter.departure)}
+                {formatDateTime(selectedDeparture)}
               </div>
             )}
           </div>
           {charter.reason && <CastRing target={charter.departure} size={48} />}
         </div>
+
+        {hasCalendar && (
+          <div className="mt-3">
+            <div style={{ color: COLORS.paperDim, fontSize: 11, fontFamily: MONO, marginBottom: 6 }}>AVAILABLE DATES</div>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {dateOptions.map((d, i) => {
+                const active = d.getTime() === selectedDeparture.getTime();
+                return (
+                  <button
+                    key={i}
+                    onClick={() => setSelectedDeparture(d)}
+                    className="px-3.5 py-2 rounded-xl text-xs font-medium whitespace-nowrap flex-shrink-0"
+                    style={{
+                      background: active ? COLORS.gold : COLORS.inkSoft,
+                      border: `1px solid ${active ? COLORS.gold : COLORS.line}`,
+                      color: active ? COLORS.ink : COLORS.paperDim,
+                    }}
+                  >
+                    {formatDate(d)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3 mt-3">
           <div className="rounded-2xl p-4" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
@@ -1267,21 +1424,21 @@ function Detail({ charter, onBack, onBook, onViewReviews, extraReviews }) {
               <span style={{ fontFamily: MONO, color: COLORS.paper, fontSize: 20, fontWeight: 500 }}>${charter.totalPrice}</span>
               <div style={{ fontSize: 11, color: COLORS.paperDim }}>total trip · up to {charter.maxGuests} guests</div>
             </div>
-            <button onClick={onBook} className="px-6 py-3 rounded-full font-semibold text-sm" style={{ background: COLORS.rust, color: COLORS.paper }}>
+            <button onClick={() => onBook(selectedDeparture)} className="px-6 py-3 rounded-full font-semibold text-sm" style={{ background: COLORS.rust, color: COLORS.paper }}>
               Book this charter
             </button>
           </>
         ) : charter.spotsLeft > 0 ? (
           <>
             <PriceBlock price={charter.price} originalPrice={charter.originalPrice} />
-            <button onClick={onBook} className="px-6 py-3 rounded-full font-semibold text-sm" style={{ background: COLORS.rust, color: COLORS.paper }}>
+            <button onClick={() => onBook(selectedDeparture)} className="px-6 py-3 rounded-full font-semibold text-sm" style={{ background: COLORS.rust, color: COLORS.paper }}>
               Claim this seat
             </button>
           </>
         ) : (
           <>
             <span style={{ color: COLORS.paperDim, fontSize: 13 }}>Sold out</span>
-            <button onClick={onBook} className="px-6 py-3 rounded-full font-semibold text-sm" style={{ background: COLORS.teal, color: COLORS.ink }}>
+            <button onClick={() => onBook(selectedDeparture)} className="px-6 py-3 rounded-full font-semibold text-sm" style={{ background: COLORS.teal, color: COLORS.ink }}>
               Join waitlist
             </button>
           </>
@@ -2933,6 +3090,9 @@ export default function LastCastApp() {
   const [pendingCaptains, setPendingCaptains] = useState([]);
   const [sponsors, setSponsors] = useState([]);
   const [extraReviews, setExtraReviews] = useState({});
+  const [favoriteIds, setFavoriteIds] = useState([]);
+  const toggleFavorite = (id) =>
+    setFavoriteIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   const goCaptainPortal = () => {
     setSide("captain");
@@ -2982,14 +3142,23 @@ export default function LastCastApp() {
                 onCaptainPortal={goCaptainPortal}
                 onAccount={goAccount}
                 angler={angler}
+                favoriteIds={favoriteIds}
+                onToggleFavorite={toggleFavorite}
               />
             )}
             {customerView === "detail" && charter && (
               <Detail
                 charter={charter}
                 onBack={() => setCustomerView("home")}
-                onBook={() => setCustomerView("booking")}
+                onBook={(selectedDeparture) => {
+                  if (selectedDeparture && selectedDeparture.getTime() !== charter.departure.getTime()) {
+                    setCharter({ ...charter, departure: selectedDeparture });
+                  }
+                  setCustomerView("booking");
+                }}
                 onViewReviews={() => setCustomerView("charterReviews")}
+                isFavorited={favoriteIds.includes(charter.id)}
+                onToggleFavorite={() => toggleFavorite(charter.id)}
                 extraReviews={extraReviews}
               />
             )}
