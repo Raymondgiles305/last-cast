@@ -24,6 +24,12 @@ const SERIF = "'Fraunces', serif";
 function inHours(h) {
   return new Date(Date.now() + h * 60 * 60 * 1000);
 }
+function inDays(d) {
+  return new Date(Date.now() + d * 24 * 60 * 60 * 1000);
+}
+function formatDate(date) {
+  return date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+}
 
 const CHARTERS = [
   {
@@ -31,6 +37,7 @@ const CHARTERS = [
     captain: "Capt. Mara Doyle",
     boat: "Silver Reel",
     location: "Destin, FL",
+    meetingPoint: "Harborwalk Marina, Dock C",
     species: ["Snapper", "Grouper"],
     type: "Offshore",
     departure: inHours(5.5),
@@ -42,12 +49,23 @@ const CHARTERS = [
     rating: 4.9,
     reason: "Bachelor party cancelled",
     img: "linear-gradient(135deg,#1c3d4a,#0e1b22)",
+    groupType: "shared",
+    captainYears: 14,
+    licensed: true,
+    included: ["Rods & tackle", "Bait", "Ice & cooler", "Fish cleaning"],
+    licenseNote: "No fishing license needed — covered by the charter",
+    weatherNote: "Captain may reschedule for unsafe weather; you'll be notified as early as possible.",
+    reviews: [
+      { name: "Danielle R.", rating: 5, comment: "Landed a huge grouper, crew was awesome the whole trip." },
+      { name: "Tom W.", rating: 5, comment: "Ran a little late getting out but worth the wait." },
+    ],
   },
   {
     id: "c2",
     captain: "Capt. Ruben Ortiz",
     boat: "Tidewater",
     location: "Galveston, TX",
+    meetingPoint: "Pelican Rush Landing",
     species: ["Redfish", "Trout"],
     type: "Inshore",
     departure: inHours(2),
@@ -59,12 +77,22 @@ const CHARTERS = [
     rating: 4.8,
     reason: "No-show",
     img: "linear-gradient(135deg,#274a3f,#0e1b22)",
+    groupType: "shared",
+    captainYears: 8,
+    licensed: true,
+    included: ["Rods & tackle", "Bait", "Ice & cooler"],
+    licenseNote: "Texas fishing license required — sold at the marina if you don't have one",
+    weatherNote: "Captain may reschedule for unsafe weather; you'll be notified as early as possible.",
+    reviews: [
+      { name: "Kayla M.", rating: 5, comment: "Redfish were everywhere, captain knew exactly where to go." },
+    ],
   },
   {
     id: "c3",
     captain: "Capt. Elin Sorensen",
     boat: "North Star",
     location: "Green Bay, WI",
+    meetingPoint: "Bay Shore Public Launch",
     species: ["Walleye", "Perch"],
     type: "Lake",
     departure: inHours(20),
@@ -76,12 +104,23 @@ const CHARTERS = [
     rating: 5.0,
     reason: "Weather rebooking",
     img: "linear-gradient(135deg,#2c3e50,#0e1b22)",
+    groupType: "private",
+    captainYears: 20,
+    licensed: true,
+    included: ["Rods & tackle", "Bait", "Ice & cooler", "Fish cleaning"],
+    licenseNote: "Wisconsin fishing license required — bring your own",
+    weatherNote: "Captain may reschedule for unsafe weather; you'll be notified as early as possible.",
+    reviews: [
+      { name: "Pete H.", rating: 5, comment: "20 years on the water shows — best walleye trip we've had." },
+      { name: "Grace L.", rating: 5, comment: "Great with our kids, very patient and knowledgeable." },
+    ],
   },
   {
     id: "c4",
     captain: "Capt. Joe Bellamy",
     boat: "Fly & Line",
     location: "Missoula, MT",
+    meetingPoint: "Clark Fork River Access",
     species: ["Trout"],
     type: "Fly",
     departure: inHours(30),
@@ -93,6 +132,85 @@ const CHARTERS = [
     rating: 4.95,
     reason: "Party of 1 dropped",
     img: "linear-gradient(135deg,#3a4a3f,#0e1b22)",
+    groupType: "private",
+    captainYears: 11,
+    licensed: true,
+    included: ["Fly rods & flies", "Waders (if needed)", "Ice & cooler"],
+    licenseNote: "Montana fishing license required — bring your own",
+    weatherNote: "Captain may reschedule for unsafe weather; you'll be notified as early as possible.",
+    reviews: [{ name: "Sam K.", rating: 5, comment: "Joe put me on fish all day, incredible local knowledge." }],
+  },
+];
+
+const STANDARD_CHARTERS = [
+  {
+    id: "s1",
+    captain: "Capt. Lena Osei",
+    boat: "Blue Horizon",
+    location: "Key West, FL",
+    meetingPoint: "Garrison Bight Marina",
+    species: ["Mahi", "Tuna"],
+    type: "Offshore",
+    departure: inDays(6),
+    duration: "7 hrs",
+    spotsLeft: 4,
+    totalSpots: 6,
+    price: 195,
+    rating: 4.85,
+    img: "linear-gradient(135deg,#1c3d4a,#0e1b22)",
+    groupType: "shared",
+    captainYears: 9,
+    licensed: true,
+    included: ["Rods & tackle", "Bait", "Ice & cooler", "Fish cleaning"],
+    licenseNote: "No fishing license needed — covered by the charter",
+    weatherNote: "Captain may reschedule for unsafe weather; you'll be notified as early as possible.",
+    reviews: [{ name: "Rachel B.", rating: 5, comment: "Mahi were biting all morning, great crew." }],
+  },
+  {
+    id: "s2",
+    captain: "Capt. Marcus Webb",
+    boat: "Bayrunner",
+    location: "Charleston, SC",
+    meetingPoint: "Shem Creek Dock",
+    species: ["Redfish", "Flounder"],
+    type: "Inshore",
+    departure: inDays(3),
+    duration: "4 hrs",
+    spotsLeft: 3,
+    totalSpots: 4,
+    price: 120,
+    rating: 4.7,
+    img: "linear-gradient(135deg,#274a3f,#0e1b22)",
+    groupType: "shared",
+    captainYears: 6,
+    licensed: true,
+    included: ["Rods & tackle", "Bait", "Ice & cooler"],
+    licenseNote: "South Carolina fishing license required — sold at the dock",
+    weatherNote: "Captain may reschedule for unsafe weather; you'll be notified as early as possible.",
+    reviews: [{ name: "Alex P.", rating: 4, comment: "Solid trip, caught a good number of redfish." }],
+  },
+  {
+    id: "s3",
+    captain: "Capt. Elin Sorensen",
+    boat: "North Star",
+    location: "Green Bay, WI",
+    meetingPoint: "Bay Shore Public Launch",
+    species: ["Walleye", "Perch"],
+    type: "Lake",
+    departure: inDays(9),
+    duration: "5 hrs",
+    spotsLeft: 4,
+    totalSpots: 4,
+    price: 140,
+    rating: 5.0,
+    img: "linear-gradient(135deg,#2c3e50,#0e1b22)",
+    groupType: "private",
+    captainYears: 20,
+    licensed: true,
+    included: ["Rods & tackle", "Bait", "Ice & cooler", "Fish cleaning"],
+    licenseNote: "Wisconsin fishing license required — bring your own",
+    weatherNote: "Captain may reschedule for unsafe weather; you'll be notified as early as possible.",
+    reviews: [{ name: "Pete H.", rating: 5, comment: "20 years on the water shows — best walleye trip we've had." }],
   },
 ];
 
@@ -181,14 +299,22 @@ function Tag({ children, tone = "gold" }) {
 }
 
 function PriceBlock({ price, originalPrice }) {
-  const pctOff = Math.round((1 - price / originalPrice) * 100);
+  const hasDiscount = originalPrice && originalPrice > price;
+  const pctOff = hasDiscount ? Math.round((1 - price / originalPrice) * 100) : 0;
   return (
     <div className="flex items-baseline gap-2">
       <span style={{ fontFamily: MONO, color: COLORS.paper, fontSize: 20, fontWeight: 500 }}>${price}</span>
-      <span style={{ fontFamily: MONO, color: COLORS.paperDim, fontSize: 13, textDecoration: "line-through", opacity: 0.6 }}>
-        ${originalPrice}
-      </span>
-      <span style={{ fontFamily: MONO, color: COLORS.rust, fontSize: 12, fontWeight: 600 }}>{pctOff}% off</span>
+      {hasDiscount && (
+        <>
+          <span style={{ fontFamily: MONO, color: COLORS.paperDim, fontSize: 13, textDecoration: "line-through", opacity: 0.6 }}>
+            ${originalPrice}
+          </span>
+          <span style={{ fontFamily: MONO, color: COLORS.rust, fontSize: 12, fontWeight: 600 }}>{pctOff}% off</span>
+        </>
+      )}
+      {!hasDiscount && (
+        <span style={{ fontFamily: MONO, color: COLORS.paperDim, fontSize: 12 }}>per seat</span>
+      )}
     </div>
   );
 }
@@ -254,19 +380,53 @@ function BrandMark({ small }) {
 /* ---------------------------------------------------------------------
    CUSTOMER: HOME
 --------------------------------------------------------------------- */
+function BrowseListingCard({ c, onSelect }) {
+  return (
+    <button
+      onClick={() => onSelect(c)}
+      className="flex gap-3 rounded-2xl p-3 text-left items-center"
+      style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}
+    >
+      <div className="w-20 h-20 rounded-xl flex-shrink-0" style={{ background: c.img }} />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span style={{ color: COLORS.paper, fontWeight: 600, fontSize: 14 }}>{c.boat}</span>
+          <span style={{ color: COLORS.gold, fontSize: 12 }}>★ {c.rating}</span>
+        </div>
+        <div style={{ color: COLORS.paperDim, fontSize: 12, marginTop: 1 }}>
+          {c.captain} · {c.location}
+        </div>
+        <div className="flex gap-1 mt-1.5 flex-wrap">
+          {c.species.map((s) => (
+            <Tag key={s} tone="teal">{s}</Tag>
+          ))}
+          <Tag tone="gold">{formatDate(c.departure)}</Tag>
+        </div>
+      </div>
+      <div className="text-right flex-shrink-0">
+        <PriceBlock price={c.price} originalPrice={c.originalPrice} />
+        <div style={{ fontSize: 11, marginTop: 4, color: COLORS.paperDim }}>{c.spotsLeft} seats left</div>
+      </div>
+    </button>
+  );
+}
+
 function Home({ onSelect, onCaptainPortal }) {
+  const [tab, setTab] = useState("deals"); // "deals" or "browse"
   const [category, setCategory] = useState("All");
   const [query, setQuery] = useState("");
 
+  const source = tab === "deals" ? CHARTERS : STANDARD_CHARTERS;
+
   const filtered = useMemo(() => {
-    return CHARTERS.filter((c) => {
+    return source.filter((c) => {
       const matchesCat = category === "All" || c.type === category;
       const q = query.trim().toLowerCase();
       const matchesQuery =
         !q || c.location.toLowerCase().includes(q) || c.species.some((s) => s.toLowerCase().includes(q));
       return matchesCat && matchesQuery;
     });
-  }, [category, query]);
+  }, [source, category, query]);
 
   const urgentDeals = [...filtered].sort((a, b) => a.departure - b.departure).slice(0, 3);
 
@@ -304,6 +464,25 @@ function Home({ onSelect, onCaptainPortal }) {
           />
         </div>
 
+        <div className="flex mt-5 rounded-full p-1" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
+          {[
+            { key: "deals", label: "⏱ Deals" },
+            { key: "browse", label: "Browse All Charters" },
+          ].map((t) => {
+            const active = tab === t.key;
+            return (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className="flex-1 py-2 rounded-full text-sm font-medium transition"
+                style={{ background: active ? COLORS.rust : "transparent", color: active ? COLORS.paper : COLORS.paperDim }}
+              >
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+
         <div className="flex gap-2 mt-4 overflow-x-auto pb-1">
           {CATEGORIES.map((c) => {
             const active = category === c.key;
@@ -326,82 +505,92 @@ function Home({ onSelect, onCaptainPortal }) {
         </div>
       </div>
 
-      <div className="px-6 pt-6" style={{ background: COLORS.ink }}>
-        <div className="flex items-center justify-between mb-3">
-          <h2 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 19, fontWeight: 600 }}>Casting off soonest</h2>
-          <span style={{ fontFamily: MONO, fontSize: 11, color: COLORS.paperDim }}>
-            {urgentDeals.length} deal{urgentDeals.length !== 1 ? "s" : ""}
-          </span>
-        </div>
+      {tab === "deals" && (
+        <div className="px-6 pt-6" style={{ background: COLORS.ink }}>
+          <div className="flex items-center justify-between mb-3">
+            <h2 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 19, fontWeight: 600 }}>Casting off soonest</h2>
+            <span style={{ fontFamily: MONO, fontSize: 11, color: COLORS.paperDim }}>
+              {urgentDeals.length} deal{urgentDeals.length !== 1 ? "s" : ""}
+            </span>
+          </div>
 
-        <div className="flex gap-3 overflow-x-auto pb-4 -mx-6 px-6">
-          {urgentDeals.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => onSelect(c)}
-              className="min-w-[230px] text-left rounded-2xl overflow-hidden flex-shrink-0"
-              style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}
-            >
-              <div className="h-24 relative" style={{ background: c.img }}>
-                <div className="absolute top-2 left-2">
-                  <Tag tone="rust">{c.reason}</Tag>
+          <div className="flex gap-3 overflow-x-auto pb-4 -mx-6 px-6">
+            {urgentDeals.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => onSelect(c)}
+                className="min-w-[230px] text-left rounded-2xl overflow-hidden flex-shrink-0"
+                style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}
+              >
+                <div className="h-24 relative" style={{ background: c.img }}>
+                  <div className="absolute top-2 left-2">
+                    <Tag tone="rust">{c.reason}</Tag>
+                  </div>
+                  <div className="absolute top-2 right-2">
+                    <CastRing target={c.departure} size={34} />
+                  </div>
                 </div>
-                <div className="absolute top-2 right-2">
-                  <CastRing target={c.departure} size={34} />
+                <div className="p-3">
+                  <div style={{ color: COLORS.paper, fontWeight: 600, fontSize: 14 }}>{c.boat}</div>
+                  <div style={{ color: COLORS.paperDim, fontSize: 12, marginTop: 2 }}>{c.location}</div>
+                  <div className="mt-2 text-xs">
+                    <CountdownLabel target={c.departure} />
+                  </div>
+                  <div className="mt-2">
+                    <PriceBlock price={c.price} originalPrice={c.originalPrice} />
+                  </div>
                 </div>
-              </div>
-              <div className="p-3">
-                <div style={{ color: COLORS.paper, fontWeight: 600, fontSize: 14 }}>{c.boat}</div>
-                <div style={{ color: COLORS.paperDim, fontSize: 12, marginTop: 2 }}>{c.location}</div>
-                <div className="mt-2 text-xs">
-                  <CountdownLabel target={c.departure} />
-                </div>
-                <div className="mt-2">
-                  <PriceBlock price={c.price} originalPrice={c.originalPrice} />
-                </div>
-              </div>
-            </button>
-          ))}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="px-6 pt-2 pb-10" style={{ background: COLORS.ink }}>
-        <h2 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 19, fontWeight: 600, marginBottom: 12 }}>All open seats</h2>
+        <h2 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 19, fontWeight: 600, marginBottom: 12 }}>
+          {tab === "deals" ? "All open seats" : "Upcoming charters"}
+        </h2>
         <div className="flex flex-col gap-3">
           {filtered.length === 0 && (
-            <div style={{ color: COLORS.paperDim, fontSize: 14 }}>No open seats match that search right now — try another spot or species.</div>
+            <div style={{ color: COLORS.paperDim, fontSize: 14 }}>
+              {tab === "deals"
+                ? "No open seats match that search right now — try another spot or species."
+                : "No upcoming charters match that search — try another spot or species."}
+            </div>
           )}
-          {filtered.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => onSelect(c)}
-              className="flex gap-3 rounded-2xl p-3 text-left items-center"
-              style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}
-            >
-              <div className="w-20 h-20 rounded-xl flex-shrink-0" style={{ background: c.img }} />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span style={{ color: COLORS.paper, fontWeight: 600, fontSize: 14 }}>{c.boat}</span>
-                  <span style={{ color: COLORS.gold, fontSize: 12 }}>★ {c.rating}</span>
+          {tab === "deals" &&
+            filtered.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => onSelect(c)}
+                className="flex gap-3 rounded-2xl p-3 text-left items-center"
+                style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}
+              >
+                <div className="w-20 h-20 rounded-xl flex-shrink-0" style={{ background: c.img }} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span style={{ color: COLORS.paper, fontWeight: 600, fontSize: 14 }}>{c.boat}</span>
+                    <span style={{ color: COLORS.gold, fontSize: 12 }}>★ {c.rating}</span>
+                  </div>
+                  <div style={{ color: COLORS.paperDim, fontSize: 12, marginTop: 1 }}>
+                    {c.captain} · {c.location}
+                  </div>
+                  <div className="flex gap-1 mt-1.5 flex-wrap">
+                    {c.species.map((s) => (
+                      <Tag key={s} tone="teal">{s}</Tag>
+                    ))}
+                    <Tag tone="rust">{c.spotsLeft} left</Tag>
+                  </div>
                 </div>
-                <div style={{ color: COLORS.paperDim, fontSize: 12, marginTop: 1 }}>
-                  {c.captain} · {c.location}
+                <div className="text-right flex-shrink-0">
+                  <PriceBlock price={c.price} originalPrice={c.originalPrice} />
+                  <div style={{ fontSize: 11, marginTop: 4 }}>
+                    <CountdownLabel target={c.departure} />
+                  </div>
                 </div>
-                <div className="flex gap-1 mt-1.5 flex-wrap">
-                  {c.species.map((s) => (
-                    <Tag key={s} tone="teal">{s}</Tag>
-                  ))}
-                  <Tag tone="rust">{c.spotsLeft} left</Tag>
-                </div>
-              </div>
-              <div className="text-right flex-shrink-0">
-                <PriceBlock price={c.price} originalPrice={c.originalPrice} />
-                <div style={{ fontSize: 11, marginTop: 4 }}>
-                  <CountdownLabel target={c.departure} />
-                </div>
-              </div>
-            </button>
-          ))}
+              </button>
+            ))}
+          {tab === "browse" && filtered.map((c) => <BrowseListingCard key={c.id} c={c} onSelect={onSelect} />)}
         </div>
       </div>
     </div>
@@ -412,6 +601,7 @@ function Home({ onSelect, onCaptainPortal }) {
    CUSTOMER: DETAIL
 --------------------------------------------------------------------- */
 function Detail({ charter, onBack, onBook }) {
+  const reviewCount = charter.reviews?.length || 0;
   return (
     <div style={{ background: COLORS.ink, minHeight: "100%" }}>
       <div className="h-56 relative" style={{ background: charter.img }}>
@@ -422,22 +612,36 @@ function Detail({ charter, onBack, onBook }) {
         >
           ←
         </button>
-        <div className="absolute bottom-3 left-4">
-          <Tag tone="rust">{charter.reason}</Tag>
-        </div>
+        {charter.reason && (
+          <div className="absolute bottom-3 left-4">
+            <Tag tone="rust">{charter.reason}</Tag>
+          </div>
+        )}
       </div>
 
       <div className="px-6 pt-5 pb-28">
         <h1 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 26, fontWeight: 600 }}>{charter.boat}</h1>
         <div style={{ color: COLORS.paperDim, fontSize: 14, marginTop: 2 }}>
           {charter.captain} · {charter.location} · ★ {charter.rating}
+          {reviewCount > 0 && ` (${reviewCount} review${reviewCount > 1 ? "s" : ""})`}
         </div>
+
+        {(charter.captainYears || charter.licensed) && (
+          <div style={{ color: COLORS.gold, fontSize: 12.5, marginTop: 4, fontFamily: MONO }}>
+            {charter.licensed ? "✓ USCG Licensed" : ""}
+            {charter.licensed && charter.captainYears ? " · " : ""}
+            {charter.captainYears ? `${charter.captainYears} years experience` : ""}
+          </div>
+        )}
 
         <div className="flex gap-2 mt-3 flex-wrap">
           {charter.species.map((s) => (
             <Tag key={s} tone="teal">{s}</Tag>
           ))}
           <Tag tone="gold">{charter.type}</Tag>
+          {charter.groupType && (
+            <Tag tone="rust">{charter.groupType === "private" ? "Private charter" : "Shared / walk-on"}</Tag>
+          )}
         </div>
 
         <div className="mt-5 rounded-2xl p-4 flex items-center justify-between" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
@@ -463,10 +667,64 @@ function Detail({ charter, onBack, onBook }) {
           </div>
         </div>
 
+        {charter.meetingPoint && (
+          <div className="mt-3 rounded-2xl p-4" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
+            <div style={{ color: COLORS.paperDim, fontSize: 12, fontFamily: MONO }}>MEETING POINT</div>
+            <div style={{ color: COLORS.paper, fontSize: 15, fontWeight: 600, marginTop: 2 }}>{charter.meetingPoint}</div>
+          </div>
+        )}
+
+        {charter.included?.length > 0 && (
+          <div className="mt-5">
+            <h3 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 16, fontWeight: 600, marginBottom: 8 }}>What's included</h3>
+            <div className="flex flex-col gap-1.5">
+              {charter.included.map((item) => (
+                <div key={item} className="flex items-center gap-2">
+                  <span style={{ color: COLORS.teal, fontSize: 13 }}>✓</span>
+                  <span style={{ color: COLORS.paperDim, fontSize: 13.5 }}>{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {charter.licenseNote && (
+          <p style={{ color: COLORS.paperDim, fontSize: 13, lineHeight: 1.5, marginTop: 14 }}>
+            <span style={{ color: COLORS.gold }}>License: </span>
+            {charter.licenseNote}
+          </p>
+        )}
+
         <p style={{ color: COLORS.paperDim, fontSize: 14, lineHeight: 1.6, marginTop: 18 }}>
-          {charter.captain.split(" ")[1]} opened this trip up after a cancellation — everything's still on: gear,
-          bait, and a boat that already knows where the fish are. First come, first reeled.
+          {charter.reason
+            ? `${charter.captain.split(" ")[1]} opened this trip up after a cancellation — everything's still on: gear, bait, and a boat that already knows where the fish are. First come, first reeled.`
+            : `A regular trip with ${charter.captain}, departing ${formatDate(charter.departure)} — gear and bait included, just bring yourself.`}
         </p>
+
+        {charter.weatherNote && (
+          <p style={{ color: COLORS.paperDim, fontSize: 12, lineHeight: 1.5, marginTop: 10, opacity: 0.8, fontStyle: "italic" }}>
+            {charter.weatherNote}
+          </p>
+        )}
+
+        {reviewCount > 0 && (
+          <div className="mt-6">
+            <h3 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 16, fontWeight: 600, marginBottom: 10 }}>
+              Reviews ({reviewCount})
+            </h3>
+            <div className="flex flex-col gap-3">
+              {charter.reviews.map((r, i) => (
+                <div key={i} className="rounded-2xl p-3.5" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
+                  <div className="flex items-center justify-between">
+                    <span style={{ color: COLORS.paper, fontSize: 13.5, fontWeight: 500 }}>{r.name}</span>
+                    <span style={{ color: COLORS.gold, fontSize: 12.5 }}>{"★".repeat(r.rating)}</span>
+                  </div>
+                  <p style={{ color: COLORS.paperDim, fontSize: 13, marginTop: 4, lineHeight: 1.5 }}>{r.comment}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div
@@ -689,25 +947,105 @@ function FeeTierCard({ joinIndex }) {
 }
 
 function PostCancellation({ onCreate, onClose }) {
-  const [form, setForm] = useState({ species: "", spots: "2", price: "", hours: "4" });
+  const [kind, setKind] = useState("cancellation"); // "cancellation" or "open"
+  const [groupType, setGroupType] = useState("shared");
+  const [form, setForm] = useState({
+    species: "",
+    spots: "2",
+    price: "",
+    hours: "4",
+    date: "",
+    meetingPoint: "",
+    included: "",
+    licenseNote: "",
+  });
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
-  const valid = form.species && form.price && Number(form.spots) > 0;
+  const valid = kind === "cancellation"
+    ? form.species && form.price && Number(form.spots) > 0 && form.hours
+    : form.species && form.price && Number(form.spots) > 0 && form.date;
 
   return (
     <div className="fixed inset-0 flex items-end justify-center z-50" style={{ background: "rgba(0,0,0,0.5)" }}>
-      <div className="w-full rounded-t-3xl p-6" style={{ background: COLORS.ink, maxWidth: 480, border: `1px solid ${COLORS.line}`, borderBottom: "none" }}>
+      <div
+        className="w-full rounded-t-3xl p-6 overflow-y-auto"
+        style={{ background: COLORS.ink, maxWidth: 480, border: `1px solid ${COLORS.line}`, borderBottom: "none", maxHeight: "88vh" }}
+      >
         <div className="flex items-center justify-between mb-5">
-          <h2 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 19, fontWeight: 600 }}>Post a cancellation</h2>
+          <h2 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 19, fontWeight: 600 }}>Post a trip</h2>
           <button onClick={onClose} style={{ color: COLORS.paperDim, fontSize: 20 }}>×</button>
         </div>
+
+        <div className="flex mb-5 rounded-full p-1" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
+          {[
+            { key: "cancellation", label: "Cancellation" },
+            { key: "open", label: "Open Trip" },
+          ].map((t) => {
+            const active = kind === t.key;
+            return (
+              <button
+                key={t.key}
+                onClick={() => setKind(t.key)}
+                className="flex-1 py-2 rounded-full text-sm font-medium transition"
+                style={{ background: active ? COLORS.rust : "transparent", color: active ? COLORS.paper : COLORS.paperDim }}
+              >
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+
         <div className="flex flex-col gap-4">
           <Field label="SPECIES / TRIP TYPE" value={form.species} onChange={set("species")} placeholder="Snapper, Grouper" />
           <div className="grid grid-cols-2 gap-3">
             <Field label="OPEN SEATS" type="number" min="1" value={form.spots} onChange={set("spots")} />
-            <Field label="DEPARTS IN (HRS)" type="number" min="1" value={form.hours} onChange={set("hours")} />
+            {kind === "cancellation" ? (
+              <Field label="DEPARTS IN (HRS)" type="number" min="1" value={form.hours} onChange={set("hours")} />
+            ) : (
+              <Field label="TRIP DATE" type="date" value={form.date} onChange={set("date")} />
+            )}
           </div>
           <Field label="PRICE PER SEAT ($)" type="number" min="1" value={form.price} onChange={set("price")} placeholder="145" />
-          <PrimaryButton disabled={!valid} onClick={() => onCreate(form)}>Post to Last Cast</PrimaryButton>
+
+          <Field label="MEETING POINT" value={form.meetingPoint} onChange={set("meetingPoint")} placeholder="Harborwalk Marina, Dock C" />
+
+          <label className="flex flex-col gap-1.5">
+            <span style={{ color: COLORS.paperDim, fontSize: 12, fontFamily: MONO }}>GROUP TYPE</span>
+            <div className="flex rounded-full p-1" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
+              {[
+                { key: "shared", label: "Shared / walk-on" },
+                { key: "private", label: "Private charter" },
+              ].map((g) => {
+                const active = groupType === g.key;
+                return (
+                  <button
+                    key={g.key}
+                    onClick={() => setGroupType(g.key)}
+                    className="flex-1 py-2 rounded-full text-xs font-medium transition"
+                    style={{ background: active ? COLORS.teal : "transparent", color: active ? COLORS.ink : COLORS.paperDim }}
+                  >
+                    {g.label}
+                  </button>
+                );
+              })}
+            </div>
+          </label>
+
+          <Field
+            label="WHAT'S INCLUDED (comma separated)"
+            value={form.included}
+            onChange={set("included")}
+            placeholder="Rods & tackle, Bait, Ice & cooler"
+          />
+          <Field
+            label="LICENSE NOTE"
+            value={form.licenseNote}
+            onChange={set("licenseNote")}
+            placeholder="e.g. No license needed — covered by the charter"
+          />
+
+          <PrimaryButton disabled={!valid} onClick={() => onCreate({ ...form, kind, groupType })}>
+            {kind === "cancellation" ? "Post to Last Cast" : "List this trip"}
+          </PrimaryButton>
         </div>
       </div>
     </div>
@@ -718,7 +1056,7 @@ function PostCancellation({ onCreate, onClose }) {
    CAPTAIN: DASHBOARD
 --------------------------------------------------------------------- */
 function CaptainDashboard({ captain, joinIndex, onExit }) {
-  const [listings, setListings] = useState([{ id: 1, species: "Redfish, Trout", spots: 2, price: 90, hours: 3 }]);
+  const [listings, setListings] = useState([{ id: 1, kind: "cancellation", species: "Redfish, Trout", spots: 2, price: 90, hours: 3 }]);
   const [showPost, setShowPost] = useState(false);
   const [sponsorInterest, setSponsorInterest] = useState(false);
 
@@ -773,9 +1111,12 @@ function CaptainDashboard({ captain, joinIndex, onExit }) {
             return (
               <div key={l.id} className="rounded-2xl p-3.5 flex items-center justify-between" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
                 <div>
-                  <div style={{ color: COLORS.paper, fontSize: 14, fontWeight: 500 }}>{l.species}</div>
-                  <div style={{ color: COLORS.paperDim, fontSize: 12, marginTop: 2 }}>
-                    {l.spots} seats · departs in {l.hours}h
+                  <div className="flex items-center gap-1.5">
+                    <span style={{ color: COLORS.paper, fontSize: 14, fontWeight: 500 }}>{l.species}</span>
+                    <Tag tone={l.kind === "open" ? "teal" : "rust"}>{l.kind === "open" ? "Open Trip" : "Cancellation"}</Tag>
+                  </div>
+                  <div style={{ color: COLORS.paperDim, fontSize: 12, marginTop: 4 }}>
+                    {l.spots} seats · {l.kind === "open" ? `trip on ${l.date}` : `departs in ${l.hours}h`}
                   </div>
                 </div>
                 <div className="text-right">
@@ -806,7 +1147,22 @@ function CaptainDashboard({ captain, joinIndex, onExit }) {
         <PostCancellation
           onClose={() => setShowPost(false)}
           onCreate={(form) => {
-            setListings((prev) => [...prev, { id: Date.now(), species: form.species, spots: Number(form.spots), price: Number(form.price), hours: Number(form.hours) }]);
+            setListings((prev) => [
+              ...prev,
+              {
+                id: Date.now(),
+                kind: form.kind,
+                species: form.species,
+                spots: Number(form.spots),
+                price: Number(form.price),
+                hours: form.kind === "cancellation" ? Number(form.hours) : null,
+                date: form.kind === "open" ? form.date : null,
+                meetingPoint: form.meetingPoint,
+                groupType: form.groupType,
+                included: form.included ? form.included.split(",").map((s) => s.trim()).filter(Boolean) : [],
+                licenseNote: form.licenseNote,
+              },
+            ]);
             setShowPost(false);
           }}
         />
