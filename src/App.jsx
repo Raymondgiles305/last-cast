@@ -226,6 +226,10 @@ const FOUNDING_CAP = 50;
 const NEXT_CAP = 100;
 const CAPTAINS_JOINED_SO_FAR = 41;
 
+// Official Last Cast platform sponsors. A captain's fee discount only applies
+// if the sponsor they claim is listed here — add real sponsors as deals close.
+const SPONSORS = [];
+
 function tierFor(joinIndex) {
   if (joinIndex <= FOUNDING_CAP) return { pct: 5, label: "Founding Captain" };
   if (joinIndex <= NEXT_CAP) return { pct: 10, label: "Early Captain" };
@@ -840,7 +844,7 @@ function CaptainLogin({ onLogin, onNew, onBackToApp, backLabel = "← Back to ap
       </button>
       <BrandMark />
       <div className="mt-6">
-        <Header title="Fill your empty seats." sub="Post a cancellation in under a minute. Get paid, keep the trip on." />
+        <Header title="Fill your empty seats." sub="Post a last-minute cancellation or list an open trip — either way, in under a minute." />
       </div>
       <div className="flex flex-col gap-4">
         <Field label="EMAIL" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@boatmail.com" />
@@ -943,6 +947,70 @@ function FeeTierCard({ joinIndex }) {
         </p>
       )}
     </div>
+  );
+}
+
+function SponsorClaim() {
+  const [selected, setSelected] = useState(SPONSORS[0]?.id || "");
+  const [proof, setProof] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const activeSponsor = SPONSORS.find((s) => s.id === selected);
+
+  if (submitted) {
+    return (
+      <div className="mt-3 rounded-xl p-3" style={{ background: `${COLORS.teal}18`, border: `1px solid ${COLORS.teal}55` }}>
+        <p style={{ color: COLORS.paper, fontSize: 12.5, lineHeight: 1.5 }}>
+          Claim submitted for <span style={{ color: COLORS.teal }}>{activeSponsor?.name}</span> — {activeSponsor?.discountPct}% off
+          your platform fee once verified.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <p style={{ color: COLORS.paperDim, fontSize: 12.5, marginTop: 6, lineHeight: 1.5 }}>
+        If a brand sponsoring you is also an official Last Cast sponsor, link it below for a discounted fee.
+      </p>
+      <label className="flex flex-col gap-1.5 mt-3">
+        <span style={{ color: COLORS.paperDim, fontSize: 11, fontFamily: MONO }}>OFFICIAL SPONSOR</span>
+        <select
+          value={selected}
+          onChange={(e) => setSelected(e.target.value)}
+          className="rounded-xl px-3 py-2.5 text-sm outline-none"
+          style={{ background: COLORS.paper, color: COLORS.ink }}
+        >
+          {SPONSORS.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name} — {s.discountPct}% off
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="flex flex-col gap-1.5 mt-3">
+        <span style={{ color: COLORS.paperDim, fontSize: 11, fontFamily: MONO }}>PROOF YOU'RE SPONSORED (email, code, or link)</span>
+        <input
+          value={proof}
+          onChange={(e) => setProof(e.target.value)}
+          placeholder="e.g. your rep's email or sponsorship code"
+          className="rounded-xl px-3 py-2.5 text-sm outline-none"
+          style={{ background: COLORS.paper, color: COLORS.ink }}
+        />
+      </label>
+      <button
+        disabled={!proof.trim()}
+        onClick={() => setSubmitted(true)}
+        className="mt-3 px-4 py-2 rounded-full text-xs font-semibold"
+        style={{
+          background: proof.trim() ? COLORS.teal : "transparent",
+          border: `1px solid ${COLORS.teal}`,
+          color: proof.trim() ? COLORS.ink : COLORS.paperDim,
+          opacity: proof.trim() ? 1 : 0.6,
+        }}
+      >
+        Submit for verification
+      </button>
+    </>
   );
 }
 
@@ -1097,7 +1165,7 @@ function CaptainDashboard({ captain, joinIndex, onExit }) {
         className="w-full mt-5 rounded-2xl py-4 font-semibold text-sm flex items-center justify-center gap-2"
         style={{ background: COLORS.rust, color: COLORS.paper }}
       >
-        + Post a cancellation
+        + Post a trip
       </button>
 
       <div className="mt-7">
@@ -1131,16 +1199,24 @@ function CaptainDashboard({ captain, joinIndex, onExit }) {
 
       <div className="mt-7 rounded-2xl p-4" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.teal}55` }}>
         <div style={{ color: COLORS.teal, fontSize: 12, fontFamily: MONO, letterSpacing: 0.5 }}>SPONSORED RATES</div>
-        <p style={{ color: COLORS.paperDim, fontSize: 12.5, marginTop: 6, lineHeight: 1.5 }}>
-          Local gear and tourism brands can subsidize your platform fee in exchange for a badge on your listings.
-        </p>
-        <button
-          onClick={() => setSponsorInterest(true)}
-          className="mt-3 px-4 py-2 rounded-full text-xs font-semibold"
-          style={{ background: sponsorInterest ? COLORS.teal : "transparent", border: `1px solid ${COLORS.teal}`, color: sponsorInterest ? COLORS.ink : COLORS.teal }}
-        >
-          {sponsorInterest ? "Interest noted ✓" : "I'm interested"}
-        </button>
+
+        {SPONSORS.length === 0 ? (
+          <>
+            <p style={{ color: COLORS.paperDim, fontSize: 12.5, marginTop: 6, lineHeight: 1.5 }}>
+              Last Cast doesn't have any official sponsors yet. Once a brand signs on as a platform sponsor, you'll
+              be able to link your matching sponsorship here for a discounted fee.
+            </p>
+            <button
+              onClick={() => setSponsorInterest(true)}
+              className="mt-3 px-4 py-2 rounded-full text-xs font-semibold"
+              style={{ background: sponsorInterest ? COLORS.teal : "transparent", border: `1px solid ${COLORS.teal}`, color: sponsorInterest ? COLORS.ink : COLORS.teal }}
+            >
+              {sponsorInterest ? "We'll notify you ✓" : "Notify me when sponsors are added"}
+            </button>
+          </>
+        ) : (
+          <SponsorClaim />
+        )}
       </div>
 
       {showPost && (
