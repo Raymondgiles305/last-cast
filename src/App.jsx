@@ -285,6 +285,17 @@ const PRIVATE_CHARTERS = [
 // like matching a captain to their reviews regardless of listing type.
 const ALL_CHARTERS = [...CHARTERS, ...STANDARD_CHARTERS, ...PRIVATE_CHARTERS];
 
+// Maps a known city name to a zip, so typing a city works the same way a
+// zip does — an anchor point for "show me what's near this," not just an
+// exact-text match. Built from the charters we actually have data for;
+// a real city lookup (any city, not just ones we have listings in) needs
+// a geocoding service once there's a backend.
+const CITY_ZIPS = {};
+ALL_CHARTERS.forEach((c) => {
+  const city = c.location.split(",")[0].trim().toLowerCase();
+  if (!CITY_ZIPS[city]) CITY_ZIPS[city] = c.zip;
+});
+
 // Simulated photo gallery. There's no real photo upload for trip images yet
 // (that's tied to the captain photo-moderation feature, still pending), so
 // this generates a few angle variants of the existing abstract art per
@@ -1233,28 +1244,41 @@ function SearchResultsPage({ initialQuery, onSelect, onBack, favoriteIds, onTogg
   const [submitted, setSubmitted] = useState(initialQuery);
   const [radius, setRadius] = useState("any");
 
-  // A typed 5-digit zip becomes the distance anchor; otherwise fall back to
-  // the logged-in angler's own zip, if any.
+  // A typed 5-digit zip, or a recognized city name, becomes the distance
+  // anchor; otherwise fall back to the logged-in angler's own zip, if any.
+  const q = submitted.trim().toLowerCase();
   const isZipQuery = /^\d{5}$/.test(submitted.trim());
-  const baseZip = isZipQuery ? submitted.trim() : angler?.zip;
+  const matchedCity = !isZipQuery && q ? Object.keys(CITY_ZIPS).find((city) => city.includes(q) || q.includes(city)) : null;
+  const isProximityQuery = isZipQuery || Boolean(matchedCity);
+  const baseZip = isZipQuery ? submitted.trim() : matchedCity ? CITY_ZIPS[matchedCity] : angler?.zip;
 
-  const textResults = useMemo(() => {
-    const q = submitted.trim().toLowerCase();
+  // A zip or recognized-city search looks at every charter by proximity,
+  // not by text match — it's "find what's near this," not a substring search.
+  const candidatePool = useMemo(() => {
+    if (isProximityQuery) return ALL_CHARTERS;
     if (!q) return [];
     return ALL_CHARTERS.filter(
       (c) =>
         c.location.toLowerCase().includes(q) ||
         c.species.some((s) => s.toLowerCase().includes(q)) ||
-        c.boat.toLowerCase().includes(q) ||
-        (c.zip && c.zip.includes(q))
+        c.boat.toLowerCase().includes(q)
     );
-  }, [submitted]);
+  }, [submitted, isProximityQuery]);
 
   const results = useMemo(() => {
-    const opt = RADIUS_OPTIONS.find((r) => r.key === radius);
-    if (!opt || opt.key === "any" || !baseZip) return textResults;
-    return textResults.filter((c) => c.zip && Math.abs(Number(c.zip) - Number(baseZip)) <= opt.maxZipDiff);
-  }, [textResults, radius, baseZip]);
+    let list = candidatePool;
+    if (baseZip) {
+      // sort nearest-first whenever we have a zip to anchor on
+      list = [...list].sort(
+        (a, b) => Math.abs(Number(a.zip) - Number(baseZip)) - Math.abs(Number(b.zip) - Number(baseZip))
+      );
+      const opt = RADIUS_OPTIONS.find((r) => r.key === radius);
+      if (opt && opt.key !== "any") {
+        list = list.filter((c) => c.zip && Math.abs(Number(c.zip) - Number(baseZip)) <= opt.maxZipDiff);
+      }
+    }
+    return list;
+  }, [candidatePool, radius, baseZip]);
 
   return (
     <div className="px-6 pt-6 pb-14" style={{ background: COLORS.ink, minHeight: "100%" }}>
@@ -1292,12 +1316,12 @@ function SearchResultsPage({ initialQuery, onSelect, onBack, favoriteIds, onTogg
       </select>
       {!baseZip && (
         <p style={{ color: COLORS.paperDim, fontSize: 10.5, marginBottom: 10, opacity: 0.7 }}>
-          Search a zip code, or log in with one on file, to filter by distance.
+          Search a zip code or city, or log in with a zip on file, to filter by distance.
         </p>
       )}
       {baseZip && (
         <p style={{ color: COLORS.paperDim, fontSize: 10.5, marginBottom: 10, opacity: 0.7 }}>
-          Distance from {isZipQuery ? baseZip : "your zip"} is an estimate based on zip codes, not exact mileage.
+          Distance from {isZipQuery ? baseZip : matchedCity ? submitted : "your zip"} is an estimate based on zip codes, not exact mileage.
         </p>
       )}
 
@@ -2241,9 +2265,9 @@ function CaptainLogin({ onLogin, onNew, onBackToApp, backLabel = "← Back to ap
 }
 
 function CaptainRegister({ onNext, onBack }) {
-  const [form, setForm] = useState({ name: "", boat: "", location: "", species: "" });
+  const [form, setForm] = useState({ name: "", boat: "", location: "", zip: "", species: "" });
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
-  const valid = form.name && form.boat && form.location;
+  const valid = form.name && form.boat && form.location && /^\d{5}$/.test(form.zip.trim());
   return (
     <div className="px-6 pt-8 pb-10">
       <button onClick={onBack} style={{ color: COLORS.paperDim, fontSize: 14 }} className="mb-4">← Back</button>
@@ -2252,6 +2276,7 @@ function CaptainRegister({ onNext, onBack }) {
         <Field label="YOUR NAME" value={form.name} onChange={set("name")} placeholder="Capt. Jamie Rivera" />
         <Field label="BOAT NAME" value={form.boat} onChange={set("boat")} placeholder="Reel Deal" />
         <Field label="HOME PORT / LOCATION" value={form.location} onChange={set("location")} placeholder="Key West, FL" />
+        <Field label="ZIP CODE" value={form.zip} onChange={set("zip")} placeholder="33040" maxLength={5} />
         <Field label="SPECIALTIES" value={form.species} onChange={set("species")} placeholder="Snapper, Grouper, Mahi" />
         <PrimaryButton disabled={!valid} onClick={() => onNext(form)}>Continue</PrimaryButton>
       </div>
@@ -3492,6 +3517,7 @@ export default function LastCastApp() {
                   { key: "name", label: "YOUR NAME", value: captain.name },
                   { key: "boat", label: "BOAT NAME", value: captain.boat },
                   { key: "location", label: "HOME PORT / LOCATION", value: captain.location },
+                  { key: "zip", label: "ZIP CODE", value: captain.zip },
                   { key: "species", label: "SPECIALTIES", value: captain.species },
                 ]}
                 onBack={() => setCaptainView("dashboard")}
