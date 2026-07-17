@@ -1219,17 +1219,42 @@ function Home({ onSelect, onCaptainPortal, onAccount, angler, favoriteIds, onTog
 /* ---------------------------------------------------------------------
    CUSTOMER: SEARCH RESULTS (separate page, only reached by pressing Enter)
 --------------------------------------------------------------------- */
-function SearchResultsPage({ initialQuery, onSelect, onBack, favoriteIds, onToggleFavorite }) {
+const RADIUS_OPTIONS = [
+  { key: "any", label: "Any distance", maxZipDiff: Infinity },
+  { key: "10", label: "Within 10 miles", maxZipDiff: 15 },
+  { key: "25", label: "Within 25 miles", maxZipDiff: 40 },
+  { key: "50", label: "Within 50 miles", maxZipDiff: 80 },
+  { key: "100", label: "Within 100 miles", maxZipDiff: 150 },
+  { key: "250", label: "Within 250 miles", maxZipDiff: 400 },
+];
+
+function SearchResultsPage({ initialQuery, onSelect, onBack, favoriteIds, onToggleFavorite, angler }) {
   const [query, setQuery] = useState(initialQuery);
   const [submitted, setSubmitted] = useState(initialQuery);
+  const [radius, setRadius] = useState("any");
 
-  const results = useMemo(() => {
+  // A typed 5-digit zip becomes the distance anchor; otherwise fall back to
+  // the logged-in angler's own zip, if any.
+  const isZipQuery = /^\d{5}$/.test(submitted.trim());
+  const baseZip = isZipQuery ? submitted.trim() : angler?.zip;
+
+  const textResults = useMemo(() => {
     const q = submitted.trim().toLowerCase();
     if (!q) return [];
     return ALL_CHARTERS.filter(
-      (c) => c.location.toLowerCase().includes(q) || c.species.some((s) => s.toLowerCase().includes(q)) || c.boat.toLowerCase().includes(q)
+      (c) =>
+        c.location.toLowerCase().includes(q) ||
+        c.species.some((s) => s.toLowerCase().includes(q)) ||
+        c.boat.toLowerCase().includes(q) ||
+        (c.zip && c.zip.includes(q))
     );
   }, [submitted]);
+
+  const results = useMemo(() => {
+    const opt = RADIUS_OPTIONS.find((r) => r.key === radius);
+    if (!opt || opt.key === "any" || !baseZip) return textResults;
+    return textResults.filter((c) => c.zip && Math.abs(Number(c.zip) - Number(baseZip)) <= opt.maxZipDiff);
+  }, [textResults, radius, baseZip]);
 
   return (
     <div className="px-6 pt-6 pb-14" style={{ background: COLORS.ink, minHeight: "100%" }}>
@@ -1245,19 +1270,44 @@ function SearchResultsPage({ initialQuery, onSelect, onBack, favoriteIds, onTogg
           onKeyDown={(e) => {
             if (e.key === "Enter" && query.trim()) setSubmitted(query.trim());
           }}
-          placeholder="Search by location, species, or boat..."
+          placeholder="Search by location, species, boat, or zip..."
           className="flex-1 bg-transparent outline-none text-sm"
           style={{ color: COLORS.ink }}
           autoFocus
         />
       </div>
+
+      <select
+        value={radius}
+        onChange={(e) => setRadius(e.target.value)}
+        disabled={!baseZip}
+        className="px-3 py-1.5 rounded-full text-xs font-medium outline-none mb-2"
+        style={{ background: "transparent", border: `1px solid ${COLORS.line}`, color: baseZip ? COLORS.paperDim : `${COLORS.paperDim}66` }}
+      >
+        {RADIUS_OPTIONS.map((r) => (
+          <option key={r.key} value={r.key} style={{ color: COLORS.ink }}>
+            {r.label}
+          </option>
+        ))}
+      </select>
+      {!baseZip && (
+        <p style={{ color: COLORS.paperDim, fontSize: 10.5, marginBottom: 10, opacity: 0.7 }}>
+          Search a zip code, or log in with one on file, to filter by distance.
+        </p>
+      )}
+      {baseZip && (
+        <p style={{ color: COLORS.paperDim, fontSize: 10.5, marginBottom: 10, opacity: 0.7 }}>
+          Distance from {isZipQuery ? baseZip : "your zip"} is an estimate based on zip codes, not exact mileage.
+        </p>
+      )}
+
       <p style={{ color: COLORS.paperDim, fontSize: 12, marginBottom: 16 }}>
         {results.length} result{results.length !== 1 ? "s" : ""} for "{submitted}"
       </p>
 
       <div className="flex flex-col gap-3">
         {results.length === 0 && (
-          <p style={{ color: COLORS.paperDim, fontSize: 14 }}>No charters match that search — try a different spot, species, or boat name.</p>
+          <p style={{ color: COLORS.paperDim, fontSize: 14 }}>No charters match that search — try a different spot, species, boat name, or zip.</p>
         )}
         {results.map((c) =>
           c.saleType === "private" ? (
@@ -3218,6 +3268,7 @@ export default function LastCastApp() {
                 onBack={() => setCustomerView("home")}
                 favoriteIds={favoriteIds}
                 onToggleFavorite={toggleFavorite}
+                angler={angler}
               />
             )}
             {customerView === "detail" && charter && (
