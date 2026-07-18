@@ -1955,7 +1955,7 @@ function AnglerRegister({ onCreate, onBack }) {
     form.phone.trim().length >= 7 &&
     form.email.includes("@") &&
     /^\d{5}$/.test(form.zip.trim()) &&
-    form.password.length >= 4;
+    form.password.length >= 6;
 
   const handleCreate = async () => {
     setError("");
