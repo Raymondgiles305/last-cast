@@ -3,6 +3,7 @@ import { auth, db } from "./firebase";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  sendEmailVerification,
 } from "firebase/auth";
 import {
   doc,
@@ -579,6 +580,71 @@ function BrandMark({ small }) {
         <span style={{ fontSize: small ? 12 : 14 }}>⚓</span>
       </div>
       <span style={{ fontFamily: MONO, color: COLORS.paperDim, fontSize: 12, letterSpacing: 1 }}>LAST CAST</span>
+    </div>
+  );
+}
+
+// Shared by both anglers and captains — shown right after sign-up, or on
+// login if the account still hasn't verified its email. Uses Firebase's
+// real email verification, not a simulated one.
+function EmailVerifyScreen({ email, onVerified, onBack }) {
+  const [sent, setSent] = useState(true); // Firebase already sent one on signup/login
+  const [checking, setChecking] = useState(false);
+  const [notYet, setNotYet] = useState(false);
+
+  const handleResend = async () => {
+    try {
+      if (auth.currentUser) await sendEmailVerification(auth.currentUser);
+      setSent(true);
+      setNotYet(false);
+    } catch (err) {
+      console.error("Failed to resend verification email:", err);
+    }
+  };
+
+  const handleCheck = async () => {
+    setChecking(true);
+    setNotYet(false);
+    try {
+      await auth.currentUser.reload();
+      if (auth.currentUser.emailVerified) {
+        onVerified();
+      } else {
+        setNotYet(true);
+      }
+    } catch (err) {
+      console.error("Failed to check verification status:", err);
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  return (
+    <div className="px-6 pt-10 pb-10 flex flex-col items-center text-center">
+      <button onClick={onBack} style={{ color: COLORS.paperDim, fontSize: 14, alignSelf: "flex-start" }} className="mb-6">
+        ← Back
+      </button>
+      <div className="w-16 h-16 rounded-full flex items-center justify-center mb-5" style={{ background: `${COLORS.gold}22`, border: `1px solid ${COLORS.gold}` }}>
+        <span style={{ fontSize: 26 }}>✉️</span>
+      </div>
+      <h1 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 22, fontWeight: 600 }}>Verify your email</h1>
+      <p style={{ color: COLORS.paperDim, fontSize: 14, marginTop: 8, lineHeight: 1.6, maxWidth: 320 }}>
+        We sent a real verification link to <b style={{ color: COLORS.paper }}>{email}</b>. Click it, then come back
+        here.
+      </p>
+      {notYet && (
+        <p style={{ color: COLORS.rust, fontSize: 12.5, marginTop: 10 }}>
+          Still not verified — check your inbox (and spam folder), then try again.
+        </p>
+      )}
+      <div className="mt-8 w-full flex flex-col gap-3">
+        <PrimaryButton disabled={checking} onClick={handleCheck}>
+          {checking ? "Checking..." : "I've verified — continue →"}
+        </PrimaryButton>
+        <button onClick={handleResend} style={{ color: COLORS.teal, fontSize: 13 }}>
+          {sent ? "Resend verification email" : "Send verification email"}
+        </button>
+      </div>
     </div>
   );
 }
@@ -1915,7 +1981,7 @@ function AnglerLogin({ onLogin, onNew, onBack }) {
     setLoading(true);
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
-      onLogin({ email: cred.user.email, uid: cred.user.uid });
+      onLogin({ email: cred.user.email, uid: cred.user.uid, emailVerified: cred.user.emailVerified });
     } catch (err) {
       if (err.code === "auth/invalid-credential" || err.code === "auth/wrong-password" || err.code === "auth/user-not-found") {
         setError("That email and password don't match an account.");
@@ -1972,6 +2038,11 @@ function AnglerRegister({ onCreate, onBack }) {
     setLoading(true);
     try {
       const cred = await createUserWithEmailAndPassword(auth, form.email.trim(), form.password);
+      try {
+        await sendEmailVerification(cred.user);
+      } catch (verifyErr) {
+        console.error("Failed to send verification email:", verifyErr);
+      }
       onCreate({
         uid: cred.user.uid,
         firstName: form.firstName.trim(),
@@ -2311,7 +2382,7 @@ function CaptainLogin({ onLogin, onNew, onBackToApp, backLabel = "← Back to ap
     setLoading(true);
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
-      onLogin({ email: cred.user.email, uid: cred.user.uid });
+      onLogin({ email: cred.user.email, uid: cred.user.uid, emailVerified: cred.user.emailVerified });
     } catch (err) {
       if (err.code === "auth/invalid-credential" || err.code === "auth/wrong-password" || err.code === "auth/user-not-found") {
         setError("That email and password don't match an account.");
@@ -2361,6 +2432,11 @@ function CaptainRegister({ onNext, onBack }) {
     setLoading(true);
     try {
       const cred = await createUserWithEmailAndPassword(auth, form.email.trim(), form.password);
+      try {
+        await sendEmailVerification(cred.user);
+      } catch (verifyErr) {
+        console.error("Failed to send verification email:", verifyErr);
+      }
       onNext({ ...form, uid: cred.user.uid });
     } catch (err) {
       if (err.code === "auth/email-already-in-use") {
@@ -3191,6 +3267,55 @@ function AdminLogin({ onLogin }) {
   );
 }
 
+function AdminCaptainAppCard({ app, onApprove, onReject }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-2xl overflow-hidden" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
+      <button onClick={() => setOpen((v) => !v)} className="w-full text-left p-3.5">
+        <div className="flex items-center justify-between">
+          <span style={{ color: COLORS.paper, fontSize: 14, fontWeight: 500 }}>{app.name}</span>
+          <span style={{ color: COLORS.paperDim, fontSize: 14 }}>{open ? "▾" : "▸"}</span>
+        </div>
+        <div style={{ color: COLORS.paperDim, fontSize: 12, marginTop: 2 }}>
+          {app.boat} · {app.location}
+        </div>
+      </button>
+
+      {open && (
+        <div className="px-3.5 pb-3.5">
+          <div className="rounded-xl p-3 mb-3" style={{ background: COLORS.ink, border: `1px solid ${COLORS.line}` }}>
+            <Row label="Captain" value={app.name} />
+            <Row label="Email" value={app.email} />
+            <Row label="Boat" value={app.boat} />
+            <Row label="Home port" value={app.location} />
+            <Row label="Zip" value={app.zip} />
+            <Row label="Specialties" value={app.species} />
+            <Row label="Submitted" value={app.createdAt ? formatDateTime(new Date(app.createdAt)) : "—"} />
+          </div>
+
+          <div className="rounded-xl p-3 mb-3" style={{ background: `${COLORS.gold}14`, border: `1px solid ${COLORS.gold}55` }}>
+            <div style={{ color: COLORS.gold, fontSize: 11, fontFamily: MONO, marginBottom: 2 }}>LICENSE ON FILE</div>
+            <div style={{ color: COLORS.paper, fontSize: 13 }}>📄 {app.licenseFileName || "None uploaded"}</div>
+            <p style={{ color: COLORS.paperDim, fontSize: 10.5, marginTop: 6, lineHeight: 1.4, opacity: 0.8 }}>
+              This confirms a file was uploaded, not a preview of the document itself — viewing the actual scan
+              needs real file storage (Firebase Storage), which isn't connected yet.
+            </p>
+          </div>
+
+          <div className="flex gap-2">
+            <button onClick={onApprove} className="flex-1 py-1.5 rounded-full text-xs font-semibold" style={{ background: COLORS.teal, color: COLORS.ink }}>
+              Approve
+            </button>
+            <button onClick={onReject} className="flex-1 py-1.5 rounded-full text-xs font-medium" style={{ border: `1px solid ${COLORS.rust}`, color: COLORS.rust }}>
+              Reject
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AdminDashboard({ pendingCaptains, onApproveCaptain, onRejectCaptain, sponsors, onAddSponsor, onRemoveSponsor, bookings, onBack }) {
   const [sponsorName, setSponsorName] = useState("");
   const [sponsorPct, setSponsorPct] = useState("10");
@@ -3231,29 +3356,7 @@ function AdminDashboard({ pendingCaptains, onApproveCaptain, onRejectCaptain, sp
         )}
         <div className="flex flex-col gap-2">
           {pendingCaptains.map((app) => (
-            <div key={app.id} className="rounded-2xl p-3.5" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
-              <div style={{ color: COLORS.paper, fontSize: 14, fontWeight: 500 }}>{app.name}</div>
-              <div style={{ color: COLORS.paperDim, fontSize: 12, marginTop: 2 }}>
-                {app.boat} · {app.location} · {app.species}
-              </div>
-              <div style={{ color: COLORS.gold, fontSize: 11.5, marginTop: 4, fontFamily: MONO }}>📄 {app.licenseFileName}</div>
-              <div className="flex gap-2 mt-3 pt-3" style={{ borderTop: `1px solid ${COLORS.line}` }}>
-                <button
-                  onClick={() => onApproveCaptain(app.id)}
-                  className="flex-1 py-1.5 rounded-full text-xs font-semibold"
-                  style={{ background: COLORS.teal, color: COLORS.ink }}
-                >
-                  Approve
-                </button>
-                <button
-                  onClick={() => onRejectCaptain(app.id)}
-                  className="flex-1 py-1.5 rounded-full text-xs font-medium"
-                  style={{ border: `1px solid ${COLORS.rust}`, color: COLORS.rust }}
-                >
-                  Reject
-                </button>
-              </div>
-            </div>
+            <AdminCaptainAppCard key={app.id} app={app} onApprove={() => onApproveCaptain(app.id)} onReject={() => onRejectCaptain(app.id)} />
           ))}
         </div>
       </div>
@@ -3346,6 +3449,7 @@ export default function LastCastApp() {
   const [captainView, setCaptainView] = useState("login");
   const cameFromDirectLink = useMemo(() => wantsCaptainEntry(), []);
   const [captain, setCaptain] = useState({});
+  const [captainPostVerifyView, setCaptainPostVerifyView] = useState("license");
   const joinIndex = CAPTAINS_JOINED_SO_FAR + 1;
   const [reviewReplies, setReviewReplies] = useState({});
   const [activeCaptainBookingId, setActiveCaptainBookingId] = useState(null);
@@ -3359,6 +3463,7 @@ export default function LastCastApp() {
   const [sponsors, setSponsors] = useState([]);
   const [extraReviews, setExtraReviews] = useState({});
   const [favoriteIds, setFavoriteIds] = useState([]);
+  const [pendingAnglerProfile, setPendingAnglerProfile] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const toggleFavorite = (id) =>
     setFavoriteIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -3515,8 +3620,20 @@ export default function LastCastApp() {
               <AnglerLogin
                 onBack={() => setCustomerView("home")}
                 onNew={() => setCustomerView("anglerRegister")}
-                onLogin={(a) => {
-                  setAngler({ name: a.email.split("@")[0], email: a.email, uid: a.uid, joinIndex: ANGLERS_JOINED_SO_FAR + 1 });
+                onLogin={async (a) => {
+                  let profile = { name: a.email.split("@")[0], email: a.email, uid: a.uid, joinIndex: ANGLERS_JOINED_SO_FAR + 1 };
+                  try {
+                    const snap = await getDoc(doc(db, "anglers", a.uid));
+                    if (snap.exists()) profile = { uid: a.uid, ...snap.data() };
+                  } catch (err) {
+                    console.error("Failed to load angler profile:", err);
+                  }
+                  if (!a.emailVerified) {
+                    setPendingAnglerProfile(profile);
+                    setCustomerView("anglerVerifyEmail");
+                    return;
+                  }
+                  setAngler(profile);
                   setCustomerView("account");
                 }}
               />
@@ -3524,8 +3641,25 @@ export default function LastCastApp() {
             {customerView === "anglerRegister" && (
               <AnglerRegister
                 onBack={() => setCustomerView("anglerLogin")}
-                onCreate={(a) => {
-                  setAngler({ ...a, joinIndex: ANGLERS_JOINED_SO_FAR + 1 });
+                onCreate={async (a) => {
+                  const profile = { ...a, joinIndex: ANGLERS_JOINED_SO_FAR + 1 };
+                  try {
+                    await setDoc(doc(db, "anglers", a.uid), profile);
+                  } catch (err) {
+                    console.error("Failed to save angler profile:", err);
+                  }
+                  setPendingAnglerProfile(profile);
+                  setCustomerView("anglerVerifyEmail");
+                }}
+              />
+            )}
+            {customerView === "anglerVerifyEmail" && pendingAnglerProfile && (
+              <EmailVerifyScreen
+                email={pendingAnglerProfile.email}
+                onBack={() => setCustomerView("home")}
+                onVerified={() => {
+                  setAngler(pendingAnglerProfile);
+                  setPendingAnglerProfile(null);
                   setCustomerView("account");
                 }}
               />
@@ -3615,20 +3749,25 @@ export default function LastCastApp() {
             {captainView === "login" && (
               <CaptainLogin
                 onLogin={async (c) => {
+                  let profile = { email: c.email, uid: c.uid };
+                  let nextView = "dashboard";
                   try {
                     const snap = await getDoc(doc(db, "captains", c.uid));
                     if (snap.exists()) {
-                      const profile = { uid: c.uid, ...snap.data() };
-                      setCaptain(profile);
-                      setCaptainView(profile.status === "approved" ? "dashboard" : "pending");
-                      return;
+                      profile = { uid: c.uid, ...snap.data() };
+                      nextView = profile.status === "approved" ? "dashboard" : "pending";
                     }
                   } catch (err) {
                     console.error("Failed to load captain profile:", err);
                   }
-                  // No application on file yet — fall back to a minimal profile
-                  setCaptain({ email: c.email, uid: c.uid });
-                  setCaptainView("dashboard");
+                  if (!c.emailVerified) {
+                    setCaptain(profile);
+                    setCaptainPostVerifyView(nextView);
+                    setCaptainView("verifyEmail");
+                    return;
+                  }
+                  setCaptain(profile);
+                  setCaptainView(nextView);
                 }}
                 onNew={() => setCaptainView("register")}
                 onBackToApp={goBackToApp}
@@ -3641,8 +3780,16 @@ export default function LastCastApp() {
                 onNext={(form) => {
                   const { password, ...safeForm } = form;
                   setCaptain(safeForm);
-                  setCaptainView("license");
+                  setCaptainPostVerifyView("license");
+                  setCaptainView("verifyEmail");
                 }}
+              />
+            )}
+            {captainView === "verifyEmail" && (
+              <EmailVerifyScreen
+                email={captain.email}
+                onBack={() => setCaptainView("login")}
+                onVerified={() => setCaptainView(captainPostVerifyView || "license")}
               />
             )}
             {captainView === "license" && (
