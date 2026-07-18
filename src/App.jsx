@@ -2410,7 +2410,7 @@ function CaptainLicense({ onNext, onBack }) {
   );
 }
 
-function CaptainPending({ isApproved, onContinue }) {
+function CaptainPending({ isApproved, onContinue, onGoAdmin }) {
   return (
     <div className="px-6 pt-16 pb-10 flex flex-col items-center text-center">
       <div
@@ -2428,10 +2428,9 @@ function CaptainPending({ isApproved, onContinue }) {
           : "We usually verify captains within 24 hours. You'll get an email the moment you're cleared to start posting seats."}
       </p>
       {!isApproved && (
-        <p style={{ color: COLORS.paperDim, fontSize: 11.5, marginTop: 10, opacity: 0.7, lineHeight: 1.4, maxWidth: 320 }}>
-          Testing this yourself? Open the admin panel in another tab (add <b>?admin=1</b> to the app's URL) and
-          approve this application there.
-        </p>
+        <button onClick={onGoAdmin} className="mt-3 px-4 py-2 rounded-full text-xs font-medium" style={{ border: `1px solid ${COLORS.line}`, color: COLORS.paperDim }}>
+          Testing this yourself? Switch to admin view →
+        </button>
       )}
       <div className="mt-8 w-full">
         <PrimaryButton disabled={!isApproved} onClick={onContinue}>
@@ -3164,7 +3163,7 @@ function AdminLogin({ onLogin }) {
   );
 }
 
-function AdminDashboard({ pendingCaptains, onApproveCaptain, onRejectCaptain, sponsors, onAddSponsor, onRemoveSponsor, bookings }) {
+function AdminDashboard({ pendingCaptains, onApproveCaptain, onRejectCaptain, sponsors, onAddSponsor, onRemoveSponsor, bookings, onBack }) {
   const [sponsorName, setSponsorName] = useState("");
   const [sponsorPct, setSponsorPct] = useState("10");
 
@@ -3176,6 +3175,9 @@ function AdminDashboard({ pendingCaptains, onApproveCaptain, onRejectCaptain, sp
 
   return (
     <div className="px-6 pt-8 pb-16">
+      <button onClick={onBack} style={{ color: COLORS.paperDim, fontSize: 14 }} className="mb-4">
+        ← Back to app
+      </button>
       <BrandMark />
       <h1 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 22, fontWeight: 600, marginTop: 16 }}>Admin dashboard</h1>
 
@@ -3592,6 +3594,7 @@ export default function LastCastApp() {
               <CaptainPending
                 isApproved={captain.id ? !pendingCaptains.some((a) => a.id === captain.id) : false}
                 onContinue={() => setCaptainView("dashboard")}
+                onGoAdmin={() => setSide("admin")}
               />
             )}
             {captainView === "dashboard" && (
@@ -3656,6 +3659,7 @@ export default function LastCastApp() {
                 onAddSponsor={(s) => setSponsors((prev) => [...prev, { ...s, id: `sp-${Date.now()}` }])}
                 onRemoveSponsor={(id) => setSponsors((prev) => prev.filter((s) => s.id !== id))}
                 bookings={anglerBookings}
+                onBack={() => setSide("captain")}
               />
             )}
           </>
