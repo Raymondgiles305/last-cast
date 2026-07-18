@@ -3326,6 +3326,7 @@ export default function LastCastApp() {
   // real admin-approval queue for captain applications, real sponsor list,
   // and real angler-submitted reviews — all shared across sides in this session
   const [pendingCaptains, setPendingCaptains] = useState([]);
+  const [approvedCaptainIds, setApprovedCaptainIds] = useState([]);
   const [sponsors, setSponsors] = useState([]);
   const [extraReviews, setExtraReviews] = useState({});
   const [favoriteIds, setFavoriteIds] = useState([]);
@@ -3592,7 +3593,7 @@ export default function LastCastApp() {
             )}
             {captainView === "pending" && (
               <CaptainPending
-                isApproved={captain.id ? !pendingCaptains.some((a) => a.id === captain.id) : false}
+                isApproved={captain.id ? approvedCaptainIds.includes(captain.id) : false}
                 onContinue={() => setCaptainView("dashboard")}
                 onGoAdmin={() => setSide("admin")}
               />
@@ -3653,7 +3654,10 @@ export default function LastCastApp() {
             ) : (
               <AdminDashboard
                 pendingCaptains={pendingCaptains}
-                onApproveCaptain={(id) => setPendingCaptains((prev) => prev.filter((a) => a.id !== id))}
+                onApproveCaptain={(id) => {
+                  setPendingCaptains((prev) => prev.filter((a) => a.id !== id));
+                  setApprovedCaptainIds((prev) => [...prev, id]);
+                }}
                 onRejectCaptain={(id) => setPendingCaptains((prev) => prev.filter((a) => a.id !== id))}
                 sponsors={sponsors}
                 onAddSponsor={(s) => setSponsors((prev) => [...prev, { ...s, id: `sp-${Date.now()}` }])}
