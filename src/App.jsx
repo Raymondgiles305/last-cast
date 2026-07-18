@@ -2292,7 +2292,29 @@ function TripDetail({ booking, onBack, onMessage, onCancel, onSubmitReview }) {
 function CaptainLogin({ onLogin, onNew, onBackToApp, backLabel = "← Back to app" }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const valid = email.includes("@") && password.length >= 4;
+
+  const handleLogin = async () => {
+    setError("");
+    setLoading(true);
+    try {
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      onLogin({ email: cred.user.email, uid: cred.user.uid });
+    } catch (err) {
+      if (err.code === "auth/invalid-credential" || err.code === "auth/wrong-password" || err.code === "auth/user-not-found") {
+        setError("That email and password don't match an account.");
+      } else if (err.code === "auth/invalid-email") {
+        setError("That doesn't look like a valid email.");
+      } else {
+        setError("Couldn't log in — please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="px-6 pt-8 pb-10">
       <button onClick={onBackToApp} style={{ color: COLORS.paperDim, fontSize: 14 }} className="mb-6">
@@ -2305,7 +2327,10 @@ function CaptainLogin({ onLogin, onNew, onBackToApp, backLabel = "← Back to ap
       <div className="flex flex-col gap-4">
         <Field label="EMAIL" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@boatmail.com" />
         <Field label="PASSWORD" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
-        <PrimaryButton disabled={!valid} onClick={onLogin}>Log in</PrimaryButton>
+        {error && <p style={{ color: COLORS.rust, fontSize: 12.5 }}>{error}</p>}
+        <PrimaryButton disabled={!valid || loading} onClick={handleLogin}>
+          {loading ? "Logging in..." : "Log in"}
+        </PrimaryButton>
         <button onClick={onNew} style={{ color: COLORS.teal, fontSize: 13, textAlign: "center" }} className="mt-1">
           New captain? Join Last Cast →
         </button>
@@ -2315,20 +2340,49 @@ function CaptainLogin({ onLogin, onNew, onBackToApp, backLabel = "← Back to ap
 }
 
 function CaptainRegister({ onNext, onBack }) {
-  const [form, setForm] = useState({ name: "", boat: "", location: "", zip: "", species: "" });
+  const [form, setForm] = useState({ name: "", boat: "", location: "", zip: "", species: "", password: "" });
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
-  const valid = form.name && form.boat && form.location && /^\d{5}$/.test(form.zip.trim());
+  const valid = form.name && form.boat && form.location && (form.email || "").includes("@") && /^\d{5}$/.test(form.zip.trim()) && form.password.length >= 6;
+
+  const handleNext = async () => {
+    setError("");
+    setLoading(true);
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, form.email.trim(), form.password);
+      onNext({ ...form, uid: cred.user.uid });
+    } catch (err) {
+      if (err.code === "auth/email-already-in-use") {
+        setError("An account already exists with that email — try logging in instead.");
+      } else if (err.code === "auth/weak-password") {
+        setError("Password needs to be at least 6 characters.");
+      } else if (err.code === "auth/invalid-email") {
+        setError("Add a valid email above so we can create your login.");
+      } else {
+        setError("Couldn't create your account — please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="px-6 pt-8 pb-10">
       <button onClick={onBack} style={{ color: COLORS.paperDim, fontSize: 14 }} className="mb-4">← Back</button>
       <Header eyebrow="STEP 1 OF 3" title="Tell us about your boat" />
       <div className="flex flex-col gap-4">
         <Field label="YOUR NAME" value={form.name} onChange={set("name")} placeholder="Capt. Jamie Rivera" />
+        <Field label="EMAIL" type="email" value={form.email || ""} onChange={set("email")} placeholder="you@boatmail.com" />
         <Field label="BOAT NAME" value={form.boat} onChange={set("boat")} placeholder="Reel Deal" />
         <Field label="HOME PORT / LOCATION" value={form.location} onChange={set("location")} placeholder="Key West, FL" />
         <Field label="ZIP CODE" value={form.zip} onChange={set("zip")} placeholder="33040" maxLength={5} />
         <Field label="SPECIALTIES" value={form.species} onChange={set("species")} placeholder="Snapper, Grouper, Mahi" />
-        <PrimaryButton disabled={!valid} onClick={() => onNext(form)}>Continue</PrimaryButton>
+        <Field label="PASSWORD" type="password" value={form.password} onChange={set("password")} placeholder="•••••••• (6+ characters)" />
+        {error && <p style={{ color: COLORS.rust, fontSize: 12.5 }}>{error}</p>}
+        <PrimaryButton disabled={!valid || loading} onClick={handleNext}>
+          {loading ? "Creating account..." : "Continue"}
+        </PrimaryButton>
       </div>
     </div>
   );
@@ -3505,7 +3559,10 @@ export default function LastCastApp() {
           <>
             {captainView === "login" && (
               <CaptainLogin
-                onLogin={() => setCaptainView("dashboard")}
+                onLogin={(c) => {
+                  setCaptain({ email: c.email, uid: c.uid });
+                  setCaptainView("dashboard");
+                }}
                 onNew={() => setCaptainView("register")}
                 onBackToApp={goBackToApp}
                 backLabel={cameFromDirectLink ? "← Looking for the angler app?" : "← Back to app"}
