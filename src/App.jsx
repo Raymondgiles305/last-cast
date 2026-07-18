@@ -1,4 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { auth } from "./firebase";
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+} from "firebase/auth";
 
 /* ---------------------------------------------------------------------
    SHARED DESIGN TOKENS
@@ -1891,7 +1896,29 @@ function Confirmed({ charter, booking, onDone }) {
 function AnglerLogin({ onLogin, onNew, onBack }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const valid = email.includes("@") && password.length >= 4;
+
+  const handleLogin = async () => {
+    setError("");
+    setLoading(true);
+    try {
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      onLogin({ email: cred.user.email, uid: cred.user.uid });
+    } catch (err) {
+      if (err.code === "auth/invalid-credential" || err.code === "auth/wrong-password" || err.code === "auth/user-not-found") {
+        setError("That email and password don't match an account.");
+      } else if (err.code === "auth/invalid-email") {
+        setError("That doesn't look like a valid email.");
+      } else {
+        setError("Couldn't log in — please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="px-6 pt-8 pb-10">
       <button onClick={onBack} style={{ color: COLORS.paperDim, fontSize: 14 }} className="mb-6">
@@ -1904,7 +1931,10 @@ function AnglerLogin({ onLogin, onNew, onBack }) {
       <div className="flex flex-col gap-4">
         <Field label="EMAIL" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@email.com" />
         <Field label="PASSWORD" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
-        <PrimaryButton disabled={!valid} onClick={() => onLogin({ email })}>Log in</PrimaryButton>
+        {error && <p style={{ color: COLORS.rust, fontSize: 12.5 }}>{error}</p>}
+        <PrimaryButton disabled={!valid || loading} onClick={handleLogin}>
+          {loading ? "Logging in..." : "Log in"}
+        </PrimaryButton>
         <button onClick={onNew} style={{ color: COLORS.teal, fontSize: 13, textAlign: "center" }} className="mt-1">
           New here? Create an account →
         </button>
@@ -1916,6 +1946,8 @@ function AnglerLogin({ onLogin, onNew, onBack }) {
 function AnglerRegister({ onCreate, onBack }) {
   const [form, setForm] = useState({ firstName: "", lastName: "", phone: "", email: "", zip: "", password: "" });
   const [licenseFileName, setLicenseFileName] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
   const valid =
     form.firstName.trim() &&
@@ -1924,6 +1956,36 @@ function AnglerRegister({ onCreate, onBack }) {
     form.email.includes("@") &&
     /^\d{5}$/.test(form.zip.trim()) &&
     form.password.length >= 4;
+
+  const handleCreate = async () => {
+    setError("");
+    setLoading(true);
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, form.email.trim(), form.password);
+      onCreate({
+        uid: cred.user.uid,
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        name: `${form.firstName.trim()} ${form.lastName.trim()}`,
+        phone: form.phone.trim(),
+        email: form.email.trim(),
+        zip: form.zip.trim(),
+        licenseFileName,
+      });
+    } catch (err) {
+      if (err.code === "auth/email-already-in-use") {
+        setError("An account already exists with that email — try logging in instead.");
+      } else if (err.code === "auth/weak-password") {
+        setError("Password needs to be at least 6 characters.");
+      } else if (err.code === "auth/invalid-email") {
+        setError("That doesn't look like a valid email.");
+      } else {
+        setError("Couldn't create your account — please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="px-6 pt-8 pb-10">
@@ -1937,7 +1999,7 @@ function AnglerRegister({ onCreate, onBack }) {
         <Field label="PHONE NUMBER" type="tel" value={form.phone} onChange={set("phone")} placeholder="(555) 123-4567" />
         <Field label="EMAIL" type="email" value={form.email} onChange={set("email")} placeholder="you@email.com" />
         <Field label="CURRENT ZIP CODE" value={form.zip} onChange={set("zip")} placeholder="33040" maxLength={5} />
-        <Field label="PASSWORD" type="password" value={form.password} onChange={set("password")} placeholder="••••••••" />
+        <Field label="PASSWORD" type="password" value={form.password} onChange={set("password")} placeholder="•••••••• (6+ characters)" />
 
         <label className="flex flex-col gap-1.5">
           <span style={{ color: COLORS.paperDim, fontSize: 12, fontFamily: MONO }}>FISHING LICENSE (OPTIONAL)</span>
@@ -1954,21 +2016,9 @@ function AnglerRegister({ onCreate, onBack }) {
           </div>
         </label>
 
-        <PrimaryButton
-          disabled={!valid}
-          onClick={() =>
-            onCreate({
-              firstName: form.firstName.trim(),
-              lastName: form.lastName.trim(),
-              name: `${form.firstName.trim()} ${form.lastName.trim()}`,
-              phone: form.phone.trim(),
-              email: form.email.trim(),
-              zip: form.zip.trim(),
-              licenseFileName,
-            })
-          }
-        >
-          Create account
+        {error && <p style={{ color: COLORS.rust, fontSize: 12.5 }}>{error}</p>}
+        <PrimaryButton disabled={!valid || loading} onClick={handleCreate}>
+          {loading ? "Creating account..." : "Create account"}
         </PrimaryButton>
       </div>
     </div>
@@ -3357,7 +3407,7 @@ export default function LastCastApp() {
                 onBack={() => setCustomerView("home")}
                 onNew={() => setCustomerView("anglerRegister")}
                 onLogin={(a) => {
-                  setAngler({ name: a.email.split("@")[0], email: a.email, joinIndex: ANGLERS_JOINED_SO_FAR + 1 });
+                  setAngler({ name: a.email.split("@")[0], email: a.email, uid: a.uid, joinIndex: ANGLERS_JOINED_SO_FAR + 1 });
                   setCustomerView("account");
                 }}
               />
