@@ -2400,6 +2400,21 @@ function CaptainRegister({ onNext, onBack }) {
 
 function CaptainLicense({ onNext, onBack }) {
   const [fileName, setFileName] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async () => {
+    setError("");
+    setLoading(true);
+    try {
+      await onNext(fileName);
+    } catch (err) {
+      setError(`Couldn't submit your application: ${err.message || "unknown error"}. Please try again.`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="px-6 pt-8 pb-10">
       <button onClick={onBack} style={{ color: COLORS.paperDim, fontSize: 14 }} className="mb-4">← Back</button>
@@ -2413,8 +2428,11 @@ function CaptainLicense({ onNext, onBack }) {
         <span style={{ color: COLORS.paper, fontSize: 14, fontWeight: 500 }}>{fileName ? fileName : "Tap to upload license & insurance"}</span>
         <span style={{ color: COLORS.paperDim, fontSize: 12 }}>PDF or photo, under 10MB</span>
       </div>
+      {error && <p style={{ color: COLORS.rust, fontSize: 12.5, marginTop: 12 }}>{error}</p>}
       <div className="mt-6">
-        <PrimaryButton disabled={!fileName} onClick={() => onNext(fileName)}>Submit for review</PrimaryButton>
+        <PrimaryButton disabled={!fileName || loading} onClick={handleSubmit}>
+          {loading ? "Submitting..." : "Submit for review"}
+        </PrimaryButton>
       </div>
     </div>
   );
@@ -3621,7 +3639,8 @@ export default function LastCastApp() {
               <CaptainRegister
                 onBack={() => setCaptainView("login")}
                 onNext={(form) => {
-                  setCaptain(form);
+                  const { password, ...safeForm } = form;
+                  setCaptain(safeForm);
                   setCaptainView("license");
                 }}
               />
@@ -3630,13 +3649,10 @@ export default function LastCastApp() {
               <CaptainLicense
                 onBack={() => setCaptainView("register")}
                 onNext={async (licenseFileName) => {
-                  const profile = { ...captain, licenseFileName, status: "pending", createdAt: Date.now() };
+                  const { password, ...safeCaptain } = captain;
+                  const profile = { ...safeCaptain, licenseFileName, status: "pending", createdAt: Date.now() };
+                  await setDoc(doc(db, "captains", captain.uid), profile);
                   setCaptain(profile);
-                  try {
-                    await setDoc(doc(db, "captains", captain.uid), profile);
-                  } catch (err) {
-                    console.error("Failed to save captain application:", err);
-                  }
                   setCaptainView("pending");
                 }}
               />
