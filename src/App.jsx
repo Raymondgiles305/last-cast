@@ -1,9 +1,19 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { auth } from "./firebase";
+import { auth, db } from "./firebase";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
 } from "firebase/auth";
+import {
+  doc,
+  setDoc,
+  getDoc,
+  updateDoc,
+  collection,
+  query,
+  where,
+  onSnapshot,
+} from "firebase/firestore";
 
 /* ---------------------------------------------------------------------
    SHARED DESIGN TOKENS
@@ -3323,16 +3333,40 @@ export default function LastCastApp() {
   const [activeCaptainBookingId, setActiveCaptainBookingId] = useState(null);
   const activeCaptainBooking = anglerBookings.find((b) => b.id === activeCaptainBookingId) || null;
 
-  // real admin-approval queue for captain applications, real sponsor list,
-  // and real angler-submitted reviews — all shared across sides in this session
+  // Real captain applications now live in Firestore's "captains" collection —
+  // this listener keeps pendingCaptains in sync live, across any tab or
+  // device, instead of resetting every time the page reloads.
   const [pendingCaptains, setPendingCaptains] = useState([]);
-  const [approvedCaptainIds, setApprovedCaptainIds] = useState([]);
+  const [captainApprovalStatus, setCaptainApprovalStatus] = useState(null); // null | "pending" | "approved" | "rejected"
   const [sponsors, setSponsors] = useState([]);
   const [extraReviews, setExtraReviews] = useState({});
   const [favoriteIds, setFavoriteIds] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const toggleFavorite = (id) =>
     setFavoriteIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
+  // Live list of every captain application still pending review — any admin,
+  // in any tab or on any device, sees the same real data from Firestore.
+  useEffect(() => {
+    const q = query(collection(db, "captains"), where("status", "==", "pending"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setPendingCaptains(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Live status for whichever captain is currently logged in on this device —
+  // updates automatically the moment an admin approves them, no refresh needed.
+  useEffect(() => {
+    if (!captain.uid) {
+      setCaptainApprovalStatus(null);
+      return;
+    }
+    const unsubscribe = onSnapshot(doc(db, "captains", captain.uid), (snap) => {
+      setCaptainApprovalStatus(snap.exists() ? snap.data().status : null);
+    });
+    return () => unsubscribe();
+  }, [captain.uid]);
 
   const goCaptainPortal = () => {
     setSide("captain");
@@ -3562,7 +3596,19 @@ export default function LastCastApp() {
           <>
             {captainView === "login" && (
               <CaptainLogin
-                onLogin={(c) => {
+                onLogin={async (c) => {
+                  try {
+                    const snap = await getDoc(doc(db, "captains", c.uid));
+                    if (snap.exists()) {
+                      const profile = { uid: c.uid, ...snap.data() };
+                      setCaptain(profile);
+                      setCaptainView(profile.status === "approved" ? "dashboard" : "pending");
+                      return;
+                    }
+                  } catch (err) {
+                    console.error("Failed to load captain profile:", err);
+                  }
+                  // No application on file yet — fall back to a minimal profile
                   setCaptain({ email: c.email, uid: c.uid });
                   setCaptainView("dashboard");
                 }}
@@ -3583,17 +3629,21 @@ export default function LastCastApp() {
             {captainView === "license" && (
               <CaptainLicense
                 onBack={() => setCaptainView("register")}
-                onNext={(licenseFileName) => {
-                  const id = `app-${Date.now()}`;
-                  setCaptain((prev) => ({ ...prev, id, licenseFileName }));
-                  setPendingCaptains((prev) => [...prev, { ...captain, id, licenseFileName }]);
+                onNext={async (licenseFileName) => {
+                  const profile = { ...captain, licenseFileName, status: "pending", createdAt: Date.now() };
+                  setCaptain(profile);
+                  try {
+                    await setDoc(doc(db, "captains", captain.uid), profile);
+                  } catch (err) {
+                    console.error("Failed to save captain application:", err);
+                  }
                   setCaptainView("pending");
                 }}
               />
             )}
             {captainView === "pending" && (
               <CaptainPending
-                isApproved={captain.id ? approvedCaptainIds.includes(captain.id) : false}
+                isApproved={captainApprovalStatus === "approved"}
                 onContinue={() => setCaptainView("dashboard")}
                 onGoAdmin={() => setSide("admin")}
               />
@@ -3654,11 +3704,20 @@ export default function LastCastApp() {
             ) : (
               <AdminDashboard
                 pendingCaptains={pendingCaptains}
-                onApproveCaptain={(id) => {
-                  setPendingCaptains((prev) => prev.filter((a) => a.id !== id));
-                  setApprovedCaptainIds((prev) => [...prev, id]);
+                onApproveCaptain={async (id) => {
+                  try {
+                    await updateDoc(doc(db, "captains", id), { status: "approved" });
+                  } catch (err) {
+                    console.error("Failed to approve captain:", err);
+                  }
                 }}
-                onRejectCaptain={(id) => setPendingCaptains((prev) => prev.filter((a) => a.id !== id))}
+                onRejectCaptain={async (id) => {
+                  try {
+                    await updateDoc(doc(db, "captains", id), { status: "rejected" });
+                  } catch (err) {
+                    console.error("Failed to reject captain:", err);
+                  }
+                }}
                 sponsors={sponsors}
                 onAddSponsor={(s) => setSponsors((prev) => [...prev, { ...s, id: `sp-${Date.now()}` }])}
                 onRemoveSponsor={(id) => setSponsors((prev) => prev.filter((s) => s.id !== id))}
