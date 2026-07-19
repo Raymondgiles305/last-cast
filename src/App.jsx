@@ -2054,6 +2054,13 @@ function AnglerLogin({ onLogin, onNew, onBack }) {
     setLoading(true);
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
+      if (!cred.user.emailVerified) {
+        try {
+          await sendEmailVerification(cred.user);
+        } catch (sendErr) {
+          console.error("Failed to send verification email on login:", sendErr);
+        }
+      }
       onLogin({ email: cred.user.email, uid: cred.user.uid, emailVerified: cred.user.emailVerified });
     } catch (err) {
       if (err.code === "auth/invalid-credential" || err.code === "auth/wrong-password" || err.code === "auth/user-not-found") {
@@ -2455,6 +2462,13 @@ function CaptainLogin({ onLogin, onNew, onBackToApp, backLabel = "← Back to ap
     setLoading(true);
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
+      if (!cred.user.emailVerified) {
+        try {
+          await sendEmailVerification(cred.user);
+        } catch (sendErr) {
+          console.error("Failed to send verification email on login:", sendErr);
+        }
+      }
       onLogin({ email: cred.user.email, uid: cred.user.uid, emailVerified: cred.user.emailVerified });
     } catch (err) {
       if (err.code === "auth/invalid-credential" || err.code === "auth/wrong-password" || err.code === "auth/user-not-found") {
