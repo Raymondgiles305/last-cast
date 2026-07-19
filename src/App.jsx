@@ -10,6 +10,8 @@ import {
   setDoc,
   getDoc,
   updateDoc,
+  deleteDoc,
+  addDoc,
   collection,
   query,
   where,
@@ -300,6 +302,68 @@ const PRIVATE_CHARTERS = [
 // Combined list across all listing types — used for cross-cutting features
 // like matching a captain to their reviews regardless of listing type.
 const ALL_CHARTERS = [...CHARTERS, ...STANDARD_CHARTERS, ...PRIVATE_CHARTERS];
+
+// Rotating art for real captain-posted listings — there's no real photo
+// upload for trip images yet (same limitation as the sample data's photo
+// gallery), so this just gives each real listing a distinct-looking card.
+const LISTING_GRADIENTS = [
+  "linear-gradient(135deg,#1c3d4a,#0e1b22)",
+  "linear-gradient(135deg,#274a3f,#0e1b22)",
+  "linear-gradient(135deg,#2c3e50,#0e1b22)",
+  "linear-gradient(135deg,#3a4a3f,#0e1b22)",
+  "linear-gradient(135deg,#1c2d3a,#0e1b22)",
+];
+function gradientFor(id) {
+  let hash = 0;
+  for (let i = 0; i < (id || "").length; i++) hash = (hash * 31 + id.charCodeAt(i)) % LISTING_GRADIENTS.length;
+  return LISTING_GRADIENTS[Math.abs(hash) % LISTING_GRADIENTS.length];
+}
+
+// Converts a real Firestore listing document into the same shape every
+// existing card/detail/booking component already expects, so none of that
+// UI needs to change to support real, captain-posted listings.
+function listingToCharter(listing) {
+  const isPrivate = listing.kind === "private";
+  let departure;
+  if (listing.kind === "cancellation" && listing.hours != null) {
+    departure = new Date((listing.createdAt || Date.now()) + Number(listing.hours) * 3600000);
+  } else if (listing.date) {
+    departure = new Date(`${listing.date}T12:00:00`);
+  } else {
+    departure = new Date();
+  }
+  const spots = Number(listing.spots) || 1;
+  const price = Number(listing.price) || 0;
+
+  return {
+    id: listing.id,
+    isRealListing: true,
+    captainUid: listing.captainUid,
+    captain: listing.captainName,
+    boat: listing.boat,
+    location: listing.location,
+    zip: listing.zip,
+    meetingPoint: listing.meetingPoint,
+    species: (listing.species || "").split(",").map((s) => s.trim()).filter(Boolean),
+    type: listing.type || "Offshore",
+    departure,
+    duration: listing.duration || "—",
+    spotsLeft: listing.spotsLeft != null ? listing.spotsLeft : spots,
+    totalSpots: spots,
+    maxGuests: spots,
+    price: isPrivate ? undefined : price,
+    totalPrice: isPrivate ? price : undefined,
+    saleType: isPrivate ? "private" : undefined,
+    rating: listing.rating || 5.0, // placeholder until real reviews are tied to real listings
+    reason: listing.kind === "cancellation" ? "Recent cancellation" : undefined,
+    groupType: listing.groupType,
+    included: listing.included || [],
+    licenseNote: listing.licenseNote,
+    notes: listing.notes,
+    img: gradientFor(listing.id),
+    reviews: [],
+  };
+}
 
 // Maps a known city name to a zip, so typing a city works the same way a
 // zip does — an anchor point for "show me what's near this," not just an
@@ -1021,18 +1085,26 @@ function PrivateCharterCard({ c, onSelect, isFavorited, onToggleFavorite }) {
   );
 }
 
-function Home({ onSelect, onCaptainPortal, onAccount, angler, favoriteIds, onToggleFavorite, onSearch }) {
+function Home({ onSelect, onCaptainPortal, onAccount, angler, favoriteIds, onToggleFavorite, onSearch, realCharters }) {
   const [tab, setTab] = useState("deals"); // "deals" | "browse" | "private" | "saved"
   const [category, setCategory] = useState("All");
   const [searchDraft, setSearchDraft] = useState("");
   const [nearMe, setNearMe] = useState(false);
   const [sortMode, setSortMode] = useState("default"); // "default" | "priceLow" | "priceHigh"
 
+  // Real, captain-posted listings merge right in alongside the sample data —
+  // a real cancellation shows up on Deals, a real open trip on Browse, a
+  // real whole-boat charter on Private, same as the demo listings always did.
+  const realCancellations = realCharters.filter((c) => c.reason);
+  const realOpenTrips = realCharters.filter((c) => !c.reason && c.saleType !== "private");
+  const realPrivateCharters = realCharters.filter((c) => c.saleType === "private");
+  const allCombined = [...CHARTERS, ...realCancellations, ...STANDARD_CHARTERS, ...realOpenTrips, ...PRIVATE_CHARTERS, ...realPrivateCharters];
+
   const source =
-    tab === "deals" ? CHARTERS
-    : tab === "browse" ? STANDARD_CHARTERS
-    : tab === "private" ? PRIVATE_CHARTERS
-    : ALL_CHARTERS.filter((c) => favoriteIds.includes(c.id));
+    tab === "deals" ? [...CHARTERS, ...realCancellations]
+    : tab === "browse" ? [...STANDARD_CHARTERS, ...realOpenTrips]
+    : tab === "private" ? [...PRIVATE_CHARTERS, ...realPrivateCharters]
+    : allCombined.filter((c) => favoriteIds.includes(c.id));
 
   // Category still filters the current tab live. Text search does NOT —
   // it only takes effect on Enter, jumping to a separate results page, so
@@ -1320,10 +1392,11 @@ const RADIUS_OPTIONS = [
   { key: "250", label: "Within 250 miles", maxZipDiff: 400 },
 ];
 
-function SearchResultsPage({ initialQuery, onSelect, onBack, favoriteIds, onToggleFavorite, angler }) {
+function SearchResultsPage({ initialQuery, onSelect, onBack, favoriteIds, onToggleFavorite, angler, realCharters }) {
   const [query, setQuery] = useState(initialQuery);
   const [submitted, setSubmitted] = useState(initialQuery);
   const [radius, setRadius] = useState("any");
+  const searchPool = useMemo(() => [...ALL_CHARTERS, ...realCharters], [realCharters]);
 
   // A typed 5-digit zip, or a recognized city name, becomes the distance
   // anchor; otherwise fall back to the logged-in angler's own zip, if any.
@@ -1336,15 +1409,15 @@ function SearchResultsPage({ initialQuery, onSelect, onBack, favoriteIds, onTogg
   // A zip or recognized-city search looks at every charter by proximity,
   // not by text match — it's "find what's near this," not a substring search.
   const candidatePool = useMemo(() => {
-    if (isProximityQuery) return ALL_CHARTERS;
+    if (isProximityQuery) return searchPool;
     if (!q) return [];
-    return ALL_CHARTERS.filter(
+    return searchPool.filter(
       (c) =>
         c.location.toLowerCase().includes(q) ||
         c.species.some((s) => s.toLowerCase().includes(q)) ||
         c.boat.toLowerCase().includes(q)
     );
-  }, [submitted, isProximityQuery]);
+  }, [submitted, isProximityQuery, searchPool]);
 
   const results = useMemo(() => {
     let list = candidatePool;
@@ -2673,6 +2746,8 @@ function PostCancellation({ onSave, onClose, initialValues }) {
   const [groupType, setGroupType] = useState(initialValues?.groupType || "shared");
   const [form, setForm] = useState({
     species: initialValues?.species || "",
+    type: initialValues?.type || "Offshore",
+    duration: initialValues?.duration || "",
     spots: initialValues ? String(initialValues.spots) : "2",
     price: initialValues ? String(initialValues.price) : "",
     hours: initialValues?.hours ? String(initialValues.hours) : "4",
@@ -2685,10 +2760,10 @@ function PostCancellation({ onSave, onClose, initialValues }) {
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
   const isPrivate = kind === "private";
   const valid = isPrivate
-    ? form.species && form.price && Number(form.spots) > 0 && form.date
+    ? form.species && form.duration && form.price && Number(form.spots) > 0 && form.date
     : kind === "cancellation"
-    ? form.species && form.price && Number(form.spots) > 0 && form.hours
-    : form.species && form.price && Number(form.spots) > 0 && form.date;
+    ? form.species && form.duration && form.price && Number(form.spots) > 0 && form.hours
+    : form.species && form.duration && form.price && Number(form.spots) > 0 && form.date;
 
   return (
     <div className="fixed inset-0 flex items-end justify-center z-50" style={{ background: "rgba(0,0,0,0.5)" }}>
@@ -2737,6 +2812,22 @@ function PostCancellation({ onSave, onClose, initialValues }) {
             onChange={set("species")}
             placeholder={isPrivate ? "Swordfish" : "Snapper, Grouper"}
           />
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex flex-col gap-1.5">
+              <span style={{ color: COLORS.paperDim, fontSize: 12, fontFamily: MONO }}>CATEGORY</span>
+              <select
+                value={form.type}
+                onChange={set("type")}
+                className="rounded-xl px-4 py-3 text-sm outline-none"
+                style={{ background: COLORS.paper, color: COLORS.ink }}
+              >
+                {CATEGORIES.filter((c) => c.key !== "All").map((c) => (
+                  <option key={c.key} value={c.key}>{c.key}</option>
+                ))}
+              </select>
+            </label>
+            <Field label="TRIP LENGTH" value={form.duration} onChange={set("duration")} placeholder="4 hrs" />
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <Field
               label={isPrivate ? "MAX GUESTS" : "OPEN SEATS"}
@@ -2823,21 +2914,30 @@ function listingWhen(l) {
   return Infinity;
 }
 
-function CaptainDashboard({ captain, joinIndex, bookings, onExit, onSettings, onPhotoChange, onOpenBooking, reviewReplies, onReplyReview, onVerifyMilitary, onRemoveMilitary, sponsors, extraReviews }) {
-  const [listings, setListings] = useState([
-    { id: 1, kind: "cancellation", species: "Redfish, Trout", spots: 2, price: 90, hours: 3, notes: "" },
-  ]);
+function CaptainDashboard({ captain, joinIndex, bookings, realListings, realBookings, onExit, onSettings, onPhotoChange, onOpenBooking, reviewReplies, onReplyReview, onVerifyMilitary, onRemoveMilitary, sponsors, extraReviews }) {
+  const listings = realListings || [];
   const [showPost, setShowPost] = useState(false);
   const [editingListing, setEditingListing] = useState(null);
   const [repostSeed, setRepostSeed] = useState(null);
   const [sponsorInterest, setSponsorInterest] = useState(false);
 
-  const stats = useMemo(() => ({ trips: 12, seatsFilled: 34, recovered: 3120 }), []);
-  const sortedListings = useMemo(() => [...listings].sort((a, b) => listingWhen(a) - listingWhen(b)), [listings]);
-  const myPassengers = useMemo(
-    () => (bookings || []).filter((b) => normalizeCaptainName(b.charter?.captain) === normalizeCaptainName(captain.name)),
-    [bookings, captain.name]
+  const stats = useMemo(
+    () => ({
+      trips: realBookings?.filter((b) => !b.waitlist).length || 0,
+      seatsFilled: realBookings?.filter((b) => !b.waitlist).reduce((s, b) => s + (b.spots || 0), 0) || 0,
+      recovered: realBookings
+        ?.filter((b) => !b.waitlist)
+        .reduce((s, b) => s + (b.charter?.saleType === "private" ? b.charter.totalPrice || 0 : (b.charter?.price || 0) * (b.spots || 0)), 0) || 0,
+    }),
+    [realBookings]
   );
+  const sortedListings = useMemo(() => [...listings].sort((a, b) => listingWhen(a) - listingWhen(b)), [listings]);
+  // Real bookings on this captain's real listings (matched by real account),
+  // plus any sample-charter bookings still matched by name for the demo data.
+  const myPassengers = useMemo(() => {
+    const nameMatched = (bookings || []).filter((b) => normalizeCaptainName(b.charter?.captain) === normalizeCaptainName(captain.name));
+    return [...(realBookings || []), ...nameMatched];
+  }, [bookings, realBookings, captain.name]);
   const myReviews = useMemo(() => {
     const out = [];
     ALL_CHARTERS.filter((c) => normalizeCaptainName(c.captain) === normalizeCaptainName(captain.name)).forEach((charter) => {
@@ -2854,11 +2954,13 @@ function CaptainDashboard({ captain, joinIndex, bookings, onExit, onSettings, on
     setRepostSeed(null);
   };
 
-  const buildListingFromForm = (form, id) => ({
-    id: id ?? Date.now(),
+  const buildListingFromForm = (form) => ({
     kind: form.kind,
     species: form.species,
+    type: form.type,
+    duration: form.duration,
     spots: Number(form.spots),
+    spotsLeft: Number(form.spots),
     price: Number(form.price),
     hours: form.kind === "cancellation" ? Number(form.hours) : null,
     date: (form.kind === "open" || form.kind === "private") ? form.date : null,
@@ -2867,6 +2969,11 @@ function CaptainDashboard({ captain, joinIndex, bookings, onExit, onSettings, on
     included: form.included ? form.included.split(",").map((s) => s.trim()).filter(Boolean) : [],
     licenseNote: form.licenseNote,
     notes: form.notes,
+    captainUid: captain.uid,
+    captainName: captain.name,
+    boat: captain.boat,
+    location: captain.location,
+    zip: captain.zip,
   });
 
   const formOpen = showPost || editingListing || repostSeed;
@@ -3046,7 +3153,7 @@ function CaptainDashboard({ captain, joinIndex, bookings, onExit, onSettings, on
                   <button
                     onClick={() => {
                       if (window.confirm("Remove this listing? Anglers will no longer see it.")) {
-                        setListings((prev) => prev.filter((x) => x.id !== l.id));
+                        deleteDoc(doc(db, "listings", l.id)).catch((err) => console.error("Failed to delete listing:", err));
                       }
                     }}
                     className="flex-1 py-1.5 rounded-full text-xs font-medium"
@@ -3106,11 +3213,15 @@ function CaptainDashboard({ captain, joinIndex, bookings, onExit, onSettings, on
         <PostCancellation
           onClose={closeForm}
           initialValues={editingListing || (repostSeed ? { ...repostSeed, id: undefined } : null)}
-          onSave={(form, id) => {
-            if (editingListing) {
-              setListings((prev) => prev.map((x) => (x.id === id ? buildListingFromForm(form, id) : x)));
-            } else {
-              setListings((prev) => [...prev, buildListingFromForm(form)]);
+          onSave={async (form, id) => {
+            try {
+              if (editingListing) {
+                await updateDoc(doc(db, "listings", id), buildListingFromForm(form));
+              } else {
+                await addDoc(collection(db, "listings"), { ...buildListingFromForm(form), createdAt: Date.now() });
+              }
+            } catch (err) {
+              console.error("Failed to save listing:", err);
             }
             closeForm();
           }}
@@ -3491,6 +3602,42 @@ export default function LastCastApp() {
     return () => unsubscribe();
   }, [captain.uid]);
 
+  // Every real, captain-posted listing across the whole platform — this is
+  // what makes Browse/Deals/Private actually show real trips, not just the
+  // sample data. Converted to the same shape the UI already expects.
+  const [realListingDocs, setRealListingDocs] = useState([]);
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "listings"), (snapshot) => {
+      setRealListingDocs(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsubscribe();
+  }, []);
+  const realCharters = useMemo(() => realListingDocs.map(listingToCharter), [realListingDocs]);
+
+  // Real bookings made against THIS captain's real listings, matched by their
+  // actual account (captainUid) — a real relational link, not name-guessing.
+  const [realCaptainBookings, setRealCaptainBookings] = useState([]);
+  useEffect(() => {
+    if (!captain.uid) {
+      setRealCaptainBookings([]);
+      return;
+    }
+    const q = query(collection(db, "bookings"), where("captainUid", "==", captain.uid));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setRealCaptainBookings(
+        snapshot.docs.map((d) => {
+          const data = d.data();
+          return {
+            id: d.id,
+            ...data,
+            charter: realListingDocs.find((l) => l.id === data.listingId) ? listingToCharter(realListingDocs.find((l) => l.id === data.listingId)) : data.charterSnapshot,
+          };
+        })
+      );
+    });
+    return () => unsubscribe();
+  }, [captain.uid, realListingDocs]);
+
   const goCaptainPortal = () => {
     setSide("captain");
     setCaptainView("login");
@@ -3522,6 +3669,39 @@ export default function LastCastApp() {
           : [{ from: "captain", text: `Confirmed! Meet at ${charter.meetingPoint || charter.location}.` }],
       },
     ]);
+
+    // If this is a real, captain-posted listing, save the booking for real —
+    // this is what lets the captain see it on their own account, matched by
+    // a real relational link instead of guessing from a matching name.
+    if (charter.isRealListing) {
+      (async () => {
+        try {
+          await addDoc(collection(db, "bookings"), {
+            listingId: charter.id,
+            captainUid: charter.captainUid,
+            anglerUid: angler?.uid || null,
+            name: draft.name,
+            email: draft.email,
+            photoUrl: angler?.photoUrl || null,
+            spots: draft.spots,
+            status: "upcoming",
+            waitlist: Boolean(draft.waitlist),
+            charterSnapshot: charter,
+            createdAt: Date.now(),
+          });
+          if (!draft.waitlist) {
+            const listingDoc = realListingDocs.find((l) => l.id === charter.id);
+            if (listingDoc) {
+              await updateDoc(doc(db, "listings", charter.id), {
+                spotsLeft: Math.max(0, (listingDoc.spotsLeft != null ? listingDoc.spotsLeft : listingDoc.spots) - draft.spots),
+              });
+            }
+          }
+        } catch (err) {
+          console.error("Failed to save real booking:", err);
+        }
+      })();
+    }
   };
 
   return (
@@ -3545,6 +3725,7 @@ export default function LastCastApp() {
                   setSearchQuery(q);
                   setCustomerView("search");
                 }}
+                realCharters={realCharters}
               />
             )}
             {customerView === "search" && (
@@ -3558,6 +3739,7 @@ export default function LastCastApp() {
                 favoriteIds={favoriteIds}
                 onToggleFavorite={toggleFavorite}
                 angler={angler}
+                realCharters={realCharters}
               />
             )}
             {customerView === "detail" && charter && (
@@ -3816,6 +3998,8 @@ export default function LastCastApp() {
                 captain={captain}
                 joinIndex={joinIndex}
                 bookings={anglerBookings}
+                realListings={realListingDocs.filter((l) => l.captainUid === captain.uid)}
+                realBookings={realCaptainBookings}
                 onExit={goBackToApp}
                 onSettings={() => setCaptainView("settings")}
                 onPhotoChange={(dataUrl) => setCaptain({ ...captain, photoUrl: dataUrl })}
