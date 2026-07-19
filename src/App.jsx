@@ -2998,11 +2998,11 @@ function CaptainDashboard({ captain, joinIndex, bookings, realListings, realBook
     included: form.included ? form.included.split(",").map((s) => s.trim()).filter(Boolean) : [],
     licenseNote: form.licenseNote,
     notes: form.notes,
-    captainUid: captain.uid,
-    captainName: captain.name,
-    boat: captain.boat,
-    location: captain.location,
-    zip: captain.zip,
+    captainUid: captain.uid || null,
+    captainName: captain.name || "Captain",
+    boat: captain.boat || "",
+    location: captain.location || "",
+    zip: captain.zip || "",
   });
 
   const formOpen = showPost || editingListing || repostSeed;
@@ -3966,7 +3966,7 @@ export default function LastCastApp() {
               <CaptainLogin
                 onLogin={async (c) => {
                   let profile = { email: c.email, uid: c.uid };
-                  let nextView = "dashboard";
+                  let nextView = "register"; // no application on file — send them to finish it, not a broken dashboard
                   try {
                     const snap = await getDoc(doc(db, "captains", c.uid));
                     if (snap.exists()) {
