@@ -3214,16 +3214,21 @@ function CaptainDashboard({ captain, joinIndex, bookings, realListings, realBook
           onClose={closeForm}
           initialValues={editingListing || (repostSeed ? { ...repostSeed, id: undefined } : null)}
           onSave={async (form, id) => {
+            if (!captain.uid) {
+              alert("Your captain account is missing its login ID — please log out and log back in, then try posting again.");
+              return;
+            }
             try {
               if (editingListing) {
                 await updateDoc(doc(db, "listings", id), buildListingFromForm(form));
               } else {
                 await addDoc(collection(db, "listings"), { ...buildListingFromForm(form), createdAt: Date.now() });
               }
+              closeForm();
             } catch (err) {
               console.error("Failed to save listing:", err);
+              alert(`Couldn't save this listing: ${err.message || "unknown error"}. Please try again.`);
             }
-            closeForm();
           }}
         />
       )}
