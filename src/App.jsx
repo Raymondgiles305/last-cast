@@ -2747,7 +2747,7 @@ function PostCancellation({ onSave, onClose, initialValues }) {
   const [form, setForm] = useState({
     species: initialValues?.species || "",
     type: initialValues?.type || "Offshore",
-    duration: initialValues?.duration || "",
+    duration: initialValues?.duration || "4 hrs",
     spots: initialValues ? String(initialValues.spots) : "2",
     price: initialValues ? String(initialValues.price) : "",
     hours: initialValues?.hours ? String(initialValues.hours) : "4",
@@ -2826,7 +2826,7 @@ function PostCancellation({ onSave, onClose, initialValues }) {
                 ))}
               </select>
             </label>
-            <Field label="TRIP LENGTH" value={form.duration} onChange={set("duration")} placeholder="4 hrs" />
+            <Field label="TRIP LENGTH *" value={form.duration} onChange={set("duration")} placeholder="4 hrs" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <Field
@@ -2896,7 +2896,22 @@ function PostCancellation({ onSave, onClose, initialValues }) {
             placeholder="e.g. Meet at the north dock, not the main one"
           />
 
-          <PrimaryButton disabled={!valid} onClick={() => onSave({ ...form, kind, groupType: isPrivate ? "private" : groupType }, initialValues?.id)}>
+          <PrimaryButton
+            onClick={() => {
+              if (!valid) {
+                const missing = [];
+                if (!form.species) missing.push("Species / trip type");
+                if (!form.duration) missing.push("Trip length");
+                if (!form.price) missing.push("Price");
+                if (!(Number(form.spots) > 0)) missing.push(isPrivate ? "Max guests" : "Open seats");
+                if (kind === "cancellation" && !form.hours) missing.push("Departs in (hrs)");
+                if ((kind === "open" || kind === "private") && !form.date) missing.push("Trip date");
+                alert(`Please fill in: ${missing.join(", ")}`);
+                return;
+              }
+              onSave({ ...form, kind, groupType: isPrivate ? "private" : groupType }, initialValues?.id);
+            }}
+          >
             {isEdit ? "Save changes" : isPrivate ? "List charter" : kind === "cancellation" ? "Post to Last Cast" : "List this trip"}
           </PrimaryButton>
         </div>
