@@ -3694,7 +3694,11 @@ export default function LastCastApp() {
         await setDoc(doc(db, "anglers", angler.uid), updates, { merge: true });
       } catch (err) {
         console.error("Failed to save angler profile update:", err);
+        alert(`This change didn't actually save: ${err.message || "unknown error"}. Please try again.`);
       }
+    } else {
+      console.error("updateAnglerProfile called with no angler.uid — nothing was saved to Firestore.");
+      alert("Couldn't save — your account isn't fully logged in. Please log out and back in, then try again.");
     }
   };
   const updateCaptainProfile = async (updates) => {
@@ -3704,7 +3708,11 @@ export default function LastCastApp() {
         await setDoc(doc(db, "captains", captain.uid), updates, { merge: true });
       } catch (err) {
         console.error("Failed to save captain profile update:", err);
+        alert(`This change didn't actually save: ${err.message || "unknown error"}. Please try again.`);
       }
+    } else {
+      console.error("updateCaptainProfile called with no captain.uid — nothing was saved to Firestore.");
+      alert("Couldn't save — your account isn't fully logged in. Please log out and back in, then try again.");
     }
   };
 
@@ -3988,7 +3996,7 @@ export default function LastCastApp() {
               <CaptainLogin
                 onLogin={async (c) => {
                   let profile = { email: c.email, uid: c.uid };
-                  let nextView = "register"; // no application on file — send them to finish it, not a broken dashboard
+                  let nextView = "register"; // default: no application on file
                   try {
                     const snap = await getDoc(doc(db, "captains", c.uid));
                     if (snap.exists()) {
@@ -3997,6 +4005,8 @@ export default function LastCastApp() {
                     }
                   } catch (err) {
                     console.error("Failed to load captain profile:", err);
+                    alert("Couldn't check your captain profile — please check your connection and try logging in again.");
+                    return;
                   }
                   if (!c.emailVerified) {
                     setCaptain(profile);
