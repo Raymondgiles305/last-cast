@@ -408,7 +408,8 @@ const CAPTAINS_JOINED_SO_FAR = 41;
 const ANGLER_FOUNDING_CAP = 2000;
 const ANGLERS_JOINED_SO_FAR = 1148; // sample count for demo purposes
 
-function tierFor(joinIndex) {
+function tierFor(joinIndex, militaryStatus) {
+  if (militaryStatus) return { pct: 5, label: "Military", locked: true };
   if (joinIndex <= FOUNDING_CAP) return { pct: 5, label: "Founding Captain" };
   if (joinIndex <= NEXT_CAP) return { pct: 10, label: "Early Captain" };
   return { pct: 15, label: "Standard" };
@@ -2664,8 +2665,8 @@ function CaptainPending({ isApproved, onContinue, onGoAdmin }) {
 /* ---------------------------------------------------------------------
    CAPTAIN: FEE TIER + POST FORM
 --------------------------------------------------------------------- */
-function FeeTierCard({ joinIndex }) {
-  const tier = tierFor(joinIndex);
+function FeeTierCard({ joinIndex, militaryStatus }) {
+  const tier = tierFor(joinIndex, militaryStatus);
   const cap = joinIndex <= FOUNDING_CAP ? FOUNDING_CAP : NEXT_CAP;
   const remaining = cap - joinIndex;
   const pctFull = Math.min(1, joinIndex / cap);
@@ -2677,7 +2678,11 @@ function FeeTierCard({ joinIndex }) {
         <span style={{ color: COLORS.gold, fontSize: 12, fontFamily: MONO, letterSpacing: 0.5 }}>{tier.label.toUpperCase()}</span>
         <span style={{ color: COLORS.paper, fontFamily: MONO, fontSize: 18, fontWeight: 500 }}>{tier.pct}% fee</span>
       </div>
-      {locked ? (
+      {tier.label === "Military" ? (
+        <p style={{ color: COLORS.paperDim, fontSize: 12.5, marginTop: 6, lineHeight: 1.5 }}>
+          🎖️ Locked in for life at 5% — thank you for your service.
+        </p>
+      ) : locked ? (
         <>
           <p style={{ color: COLORS.paperDim, fontSize: 12.5, marginTop: 6, lineHeight: 1.5 }}>
             Locked in for life — you're captain #{joinIndex}. Only {remaining} spot{remaining !== 1 ? "s" : ""} left at this rate before it rises.
@@ -3065,7 +3070,7 @@ function CaptainDashboard({ captain, joinIndex, bookings, realListings, realBook
         <VeteranVerification status={captain.militaryStatus} onVerify={onVerifyMilitary} onRemove={onRemoveMilitary} />
       </div>
 
-      <FeeTierCard joinIndex={joinIndex} />
+      <FeeTierCard joinIndex={joinIndex} militaryStatus={captain.militaryStatus} />
 
       <div className="grid grid-cols-3 gap-2 mt-4">
         {[["Trips run", stats.trips], ["Seats filled", stats.seatsFilled], ["Recovered", `$${stats.recovered.toLocaleString()}`]].map(([label, val]) => (
@@ -3166,7 +3171,7 @@ function CaptainDashboard({ captain, joinIndex, bookings, realListings, realBook
         )}
         <div className="flex flex-col gap-2">
           {sortedListings.map((l) => {
-            const net = (l.price * (1 - tierFor(joinIndex).pct / 100)).toFixed(0);
+            const net = (l.price * (1 - tierFor(joinIndex, captain.militaryStatus).pct / 100)).toFixed(0);
             return (
               <div key={l.id} className="rounded-2xl p-3.5" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
                 <div className="flex items-center justify-between">
