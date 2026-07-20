@@ -3703,7 +3703,12 @@ export default function LastCastApp() {
 
   const goCaptainPortal = () => {
     setSide("captain");
-    setCaptainView("login");
+    // Only send them to the login screen if there's no logged-in captain
+    // this session — otherwise this was wiping out an active dashboard
+    // session every time someone tapped "Back to app" and then came back.
+    if (!captain.uid) {
+      setCaptainView("login");
+    }
   };
   const goBackToApp = () => {
     setSide("customer");
