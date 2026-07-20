@@ -3684,6 +3684,30 @@ export default function LastCastApp() {
     setCustomerView(angler ? "account" : "anglerLogin");
   };
 
+  // Updates local profile state AND persists the change to Firestore in one
+  // step, so photo uploads, settings edits, license changes, and military
+  // verification all actually stick around after logging back in.
+  const updateAnglerProfile = async (updates) => {
+    setAngler((prev) => ({ ...prev, ...updates }));
+    if (angler?.uid) {
+      try {
+        await setDoc(doc(db, "anglers", angler.uid), updates, { merge: true });
+      } catch (err) {
+        console.error("Failed to save angler profile update:", err);
+      }
+    }
+  };
+  const updateCaptainProfile = async (updates) => {
+    setCaptain((prev) => ({ ...prev, ...updates }));
+    if (captain?.uid) {
+      try {
+        await setDoc(doc(db, "captains", captain.uid), updates, { merge: true });
+      } catch (err) {
+        console.error("Failed to save captain profile update:", err);
+      }
+    }
+  };
+
   const finalizeBooking = (draft) => {
     setBooking(draft);
     setCustomerView("confirmed");
@@ -3894,9 +3918,9 @@ export default function LastCastApp() {
                   setCustomerView("tripDetail");
                 }}
                 onSettings={() => setCustomerView("anglerSettings")}
-                onPhotoChange={(dataUrl) => setAngler({ ...angler, photoUrl: dataUrl })}
-                onVerifyMilitary={(status) => setAngler({ ...angler, militaryStatus: status })}
-                onRemoveMilitary={() => setAngler({ ...angler, militaryStatus: null })}
+                onPhotoChange={(dataUrl) => updateAnglerProfile({ photoUrl: dataUrl })}
+                onVerifyMilitary={(status) => updateAnglerProfile({ militaryStatus: status })}
+                onRemoveMilitary={() => updateAnglerProfile({ militaryStatus: null })}
               />
             )}
             {customerView === "anglerSettings" && angler && (
@@ -3910,9 +3934,7 @@ export default function LastCastApp() {
                   { key: "zip", label: "CURRENT ZIP CODE", value: angler.zip },
                 ]}
                 onBack={() => setCustomerView("account")}
-                onSave={(values) =>
-                  setAngler({ ...angler, ...values, name: `${values.firstName} ${values.lastName}` })
-                }
+                onSave={(values) => updateAnglerProfile({ ...values, name: `${values.firstName} ${values.lastName}` })}
                 onLogout={() => {
                   setAngler(null);
                   setCustomerView("home");
@@ -3924,7 +3946,7 @@ export default function LastCastApp() {
                 }}
                 showLicense
                 licenseFileName={angler.licenseFileName}
-                onUploadLicense={(fileName) => setAngler({ ...angler, licenseFileName: fileName })}
+                onUploadLicense={(fileName) => updateAnglerProfile({ licenseFileName: fileName })}
               />
             )}
             {customerView === "tripDetail" && activeTrip && (
@@ -4036,15 +4058,15 @@ export default function LastCastApp() {
                 realBookings={realCaptainBookings}
                 onExit={goBackToApp}
                 onSettings={() => setCaptainView("settings")}
-                onPhotoChange={(dataUrl) => setCaptain({ ...captain, photoUrl: dataUrl })}
+                onPhotoChange={(dataUrl) => updateCaptainProfile({ photoUrl: dataUrl })}
                 reviewReplies={reviewReplies}
                 onReplyReview={(key, text) => setReviewReplies((prev) => ({ ...prev, [key]: text }))}
                 onOpenBooking={(b) => {
                   setActiveCaptainBookingId(b.id);
                   setCaptainView("bookingDetail");
                 }}
-                onVerifyMilitary={(status) => setCaptain({ ...captain, militaryStatus: status })}
-                onRemoveMilitary={() => setCaptain({ ...captain, militaryStatus: null })}
+                onVerifyMilitary={(status) => updateCaptainProfile({ militaryStatus: status })}
+                onRemoveMilitary={() => updateCaptainProfile({ militaryStatus: null })}
                 sponsors={sponsors}
                 extraReviews={extraReviews}
               />
@@ -4063,7 +4085,7 @@ export default function LastCastApp() {
                   { key: "species", label: "SPECIALTIES", value: captain.species },
                 ]}
                 onBack={() => setCaptainView("dashboard")}
-                onSave={(values) => setCaptain({ ...captain, ...values })}
+                onSave={(values) => updateCaptainProfile(values)}
                 onLogout={() => {
                   setCaptain({});
                   setCaptainView("login");
