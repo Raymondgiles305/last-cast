@@ -2561,6 +2561,35 @@ function CaptainRegister({ onNext, onBack }) {
   );
 }
 
+// For a captain who's already logged in (real Firebase Auth account exists)
+// but has no saved profile — happens if they never finished sign-up, or an
+// earlier save silently failed. This only writes to Firestore, it never
+// touches Firebase Auth, so it can't hit "email already in use."
+function CaptainCompleteProfile({ email, onNext, onBack }) {
+  const [form, setForm] = useState({ name: "", boat: "", location: "", zip: "", species: "" });
+  const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+  const valid = form.name && form.boat && form.location && /^\d{5}$/.test(form.zip.trim());
+
+  return (
+    <div className="px-6 pt-8 pb-10">
+      <button onClick={onBack} style={{ color: COLORS.paperDim, fontSize: 14 }} className="mb-4">← Back</button>
+      <Header
+        eyebrow="ONE MORE STEP"
+        title="Finish your captain profile"
+        sub={`You're logged in as ${email}, but we don't have your boat info on file yet — let's finish it now.`}
+      />
+      <div className="flex flex-col gap-4">
+        <Field label="YOUR NAME" value={form.name} onChange={set("name")} placeholder="Capt. Jamie Rivera" />
+        <Field label="BOAT NAME" value={form.boat} onChange={set("boat")} placeholder="Reel Deal" />
+        <Field label="HOME PORT / LOCATION" value={form.location} onChange={set("location")} placeholder="Key West, FL" />
+        <Field label="ZIP CODE" value={form.zip} onChange={set("zip")} placeholder="33040" maxLength={5} />
+        <Field label="SPECIALTIES" value={form.species} onChange={set("species")} placeholder="Snapper, Grouper, Mahi" />
+        <PrimaryButton disabled={!valid} onClick={() => onNext(form)}>Continue</PrimaryButton>
+      </div>
+    </div>
+  );
+}
+
 function CaptainLicense({ onNext, onBack }) {
   const [fileName, setFileName] = useState("");
   const [error, setError] = useState("");
@@ -3996,7 +4025,7 @@ export default function LastCastApp() {
               <CaptainLogin
                 onLogin={async (c) => {
                   let profile = { email: c.email, uid: c.uid };
-                  let nextView = "register"; // default: no application on file
+                  let nextView = "completeProfile"; // real account exists, just no profile on file yet
                   try {
                     const snap = await getDoc(doc(db, "captains", c.uid));
                     if (snap.exists()) {
@@ -4030,6 +4059,16 @@ export default function LastCastApp() {
                   setCaptain(safeForm);
                   setCaptainPostVerifyView("license");
                   setCaptainView("verifyEmail");
+                }}
+              />
+            )}
+            {captainView === "completeProfile" && (
+              <CaptainCompleteProfile
+                email={captain.email}
+                onBack={() => setCaptainView("login")}
+                onNext={(form) => {
+                  setCaptain({ ...captain, ...form });
+                  setCaptainView("license");
                 }}
               />
             )}
