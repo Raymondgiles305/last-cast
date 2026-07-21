@@ -409,10 +409,12 @@ const ANGLER_FOUNDING_CAP = 2000;
 const ANGLERS_JOINED_SO_FAR = 1148; // sample count for demo purposes
 
 function tierFor(joinIndex, militaryStatus) {
-  if (militaryStatus) return { pct: 5, label: "Military", locked: true };
-  if (joinIndex <= FOUNDING_CAP) return { pct: 5, label: "Founding Captain" };
-  if (joinIndex <= NEXT_CAP) return { pct: 10, label: "Early Captain" };
-  return { pct: 15, label: "Standard" };
+  const base =
+    joinIndex <= FOUNDING_CAP ? { pct: 5, label: "Founding Captain" }
+    : joinIndex <= NEXT_CAP ? { pct: 10, label: "Early Captain" }
+    : { pct: 15, label: "Standard" };
+  if (militaryStatus) return { ...base, pct: 5, militaryDiscount: true };
+  return base;
 }
 
 /* ---------------------------------------------------------------------
@@ -2678,11 +2680,7 @@ function FeeTierCard({ joinIndex, militaryStatus }) {
         <span style={{ color: COLORS.gold, fontSize: 12, fontFamily: MONO, letterSpacing: 0.5 }}>{tier.label.toUpperCase()}</span>
         <span style={{ color: COLORS.paper, fontFamily: MONO, fontSize: 18, fontWeight: 500 }}>{tier.pct}% fee</span>
       </div>
-      {tier.label === "Military" ? (
-        <p style={{ color: COLORS.paperDim, fontSize: 12.5, marginTop: 6, lineHeight: 1.5 }}>
-          🎖️ Locked in for life at 5% — thank you for your service.
-        </p>
-      ) : locked ? (
+      {locked && !tier.militaryDiscount ? (
         <>
           <p style={{ color: COLORS.paperDim, fontSize: 12.5, marginTop: 6, lineHeight: 1.5 }}>
             Locked in for life — you're captain #{joinIndex}. Only {remaining} spot{remaining !== 1 ? "s" : ""} left at this rate before it rises.
@@ -2691,9 +2689,16 @@ function FeeTierCard({ joinIndex, militaryStatus }) {
             <div className="h-1.5 rounded-full" style={{ width: `${pctFull * 100}%`, background: COLORS.gold }} />
           </div>
         </>
-      ) : (
+      ) : !tier.militaryDiscount ? (
         <p style={{ color: COLORS.paperDim, fontSize: 12.5, marginTop: 6, lineHeight: 1.5 }}>
           Standard platform rate. Ask about sponsor-subsidized rates below.
+        </p>
+      ) : null}
+      {tier.militaryDiscount && (
+        <p style={{ color: COLORS.paperDim, fontSize: 12.5, marginTop: 6, lineHeight: 1.5 }}>
+          🎖️ Your 5% rate is guaranteed for life as thanks for your service — separate from (and doesn't use up) a
+          founding captain spot.
+          {joinIndex <= FOUNDING_CAP && " You're also a real Founding Captain, #" + joinIndex + "."}
         </p>
       )}
     </div>
