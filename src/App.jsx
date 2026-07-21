@@ -657,8 +657,8 @@ function BrandMark({ small }) {
 // or "profile" — computed by the shell from current view + Home sub-tab.
 function BottomTabBar({ active, onHome, onCharters, onProfile }) {
   const items = [
-    { key: "home", label: "Home", icon: "🏠", onClick: onHome },
-    { key: "charters", label: "Charters", icon: "🎣", onClick: onCharters },
+    { key: "home", label: "Deals", icon: "🏠", onClick: onHome },
+    { key: "charters", label: "Open Charters", icon: "🎣", onClick: onCharters },
     { key: "profile", label: "Profile", icon: "👤", onClick: onProfile },
   ];
   return (
