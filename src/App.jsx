@@ -3431,7 +3431,32 @@ function CaptainReviews({ myReviews, replies, onReply }) {
 function AdminLogin({ onLogin }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const valid = email.includes("@") && password.length >= 4;
+
+  const handleLogin = async () => {
+    setError("");
+    setLoading(true);
+    try {
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      const snap = await getDoc(doc(db, "admins", cred.user.uid));
+      if (!snap.exists()) {
+        setError("This account isn't authorized as an admin.");
+        return;
+      }
+      onLogin();
+    } catch (err) {
+      if (err.code === "auth/invalid-credential" || err.code === "auth/wrong-password" || err.code === "auth/user-not-found") {
+        setError("That email and password don't match an account.");
+      } else {
+        setError("Couldn't log in — please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="px-6 pt-10 pb-10">
       <BrandMark />
@@ -3441,10 +3466,14 @@ function AdminLogin({ onLogin }) {
       <div className="flex flex-col gap-4">
         <Field label="EMAIL" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@lastcast.app" />
         <Field label="PASSWORD" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
-        <PrimaryButton disabled={!valid} onClick={onLogin}>Log in</PrimaryButton>
+        {error && <p style={{ color: COLORS.rust, fontSize: 12.5 }}>{error}</p>}
+        <PrimaryButton disabled={!valid || loading} onClick={handleLogin}>
+          {loading ? "Logging in..." : "Log in"}
+        </PrimaryButton>
         <p style={{ color: COLORS.paperDim, fontSize: 11, marginTop: 4, opacity: 0.7, lineHeight: 1.4 }}>
-          This login doesn't check anything real yet — same as the rest of the app until the backend exists. Anyone
-          who knows the ?admin=1 link can reach this screen for now.
+          This is a real, restricted login — an account only gets in if it's listed in the admins collection in
+          Firestore. There's no sign-up screen here on purpose; admin accounts are only ever created directly in
+          Firebase Console, never from the app itself.
         </p>
       </div>
     </div>
