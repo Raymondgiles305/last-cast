@@ -3480,6 +3480,58 @@ function AdminLogin({ onLogin }) {
   );
 }
 
+function AdminAccountCard({ account, fields, onSave, onDelete }) {
+  const [open, setOpen] = useState(false);
+  const [values, setValues] = useState(() => Object.fromEntries(fields.map((f) => [f.key, account[f.key] || ""])));
+  const [saved, setSaved] = useState(false);
+  const set = (k) => (e) => {
+    setValues({ ...values, [k]: e.target.value });
+    setSaved(false);
+  };
+  const title = account.name || `${account.firstName || ""} ${account.lastName || ""}`.trim() || account.email || account.id;
+
+  return (
+    <div className="rounded-2xl overflow-hidden" style={{ background: COLORS.inkSoft, border: `1px solid ${COLORS.line}` }}>
+      <button onClick={() => setOpen((v) => !v)} className="w-full text-left p-3.5">
+        <div className="flex items-center justify-between">
+          <span style={{ color: COLORS.paper, fontSize: 14, fontWeight: 500 }}>{title}</span>
+          <span style={{ color: COLORS.paperDim, fontSize: 14 }}>{open ? "▾" : "▸"}</span>
+        </div>
+        <div style={{ color: COLORS.paperDim, fontSize: 12, marginTop: 2 }}>{account.email}</div>
+      </button>
+
+      {open && (
+        <div className="px-3.5 pb-3.5 flex flex-col gap-3">
+          {fields.map((f) => (
+            <Field key={f.key} label={f.label} value={values[f.key]} onChange={set(f.key)} />
+          ))}
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                onSave(values);
+                setSaved(true);
+              }}
+              className="flex-1 py-1.5 rounded-full text-xs font-semibold"
+              style={{ background: COLORS.teal, color: COLORS.ink }}
+            >
+              {saved ? "Saved ✓" : "Save changes"}
+            </button>
+            <button
+              onClick={() => {
+                if (window.confirm("Delete this account's saved profile? This can't be undone.")) onDelete();
+              }}
+              className="flex-1 py-1.5 rounded-full text-xs font-medium"
+              style={{ border: `1px solid ${COLORS.rust}`, color: COLORS.rust }}
+            >
+              Delete profile
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AdminCaptainAppCard({ app, onApprove, onReject }) {
   const [open, setOpen] = useState(false);
   return (
@@ -3529,7 +3581,7 @@ function AdminCaptainAppCard({ app, onApprove, onReject }) {
   );
 }
 
-function AdminDashboard({ pendingCaptains, onApproveCaptain, onRejectCaptain, sponsors, onAddSponsor, onRemoveSponsor, bookings, onBack }) {
+function AdminDashboard({ pendingCaptains, onApproveCaptain, onRejectCaptain, sponsors, onAddSponsor, onRemoveSponsor, bookings, onBack, allCaptains, allAnglers, onUpdateCaptain, onDeleteCaptain, onUpdateAngler, onDeleteAngler }) {
   const [sponsorName, setSponsorName] = useState("");
   const [sponsorPct, setSponsorPct] = useState("10");
 
@@ -3602,6 +3654,61 @@ function AdminDashboard({ pendingCaptains, onApproveCaptain, onRejectCaptain, sp
         >
           + Add sponsor
         </button>
+      </div>
+
+      <div className="mt-7">
+        <h2 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 17, fontWeight: 600, marginBottom: 4 }}>Manage captains</h2>
+        <p style={{ color: COLORS.paperDim, fontSize: 11.5, marginBottom: 10, lineHeight: 1.4, opacity: 0.85 }}>
+          Every captain account, any status — edit their info or remove their profile.
+        </p>
+        {allCaptains.length === 0 && <p style={{ color: COLORS.paperDim, fontSize: 13 }}>No captain accounts yet.</p>}
+        <div className="flex flex-col gap-2">
+          {allCaptains.map((c) => (
+            <AdminAccountCard
+              key={c.id}
+              account={c}
+              fields={[
+                { key: "name", label: "NAME" },
+                { key: "boat", label: "BOAT" },
+                { key: "location", label: "HOME PORT" },
+                { key: "zip", label: "ZIP" },
+                { key: "species", label: "SPECIALTIES" },
+                { key: "status", label: "STATUS" },
+              ]}
+              onSave={(updates) => onUpdateCaptain(c.id, updates)}
+              onDelete={() => onDeleteCaptain(c.id)}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-7">
+        <h2 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 17, fontWeight: 600, marginBottom: 4 }}>Manage anglers</h2>
+        <p style={{ color: COLORS.paperDim, fontSize: 11.5, marginBottom: 10, lineHeight: 1.4, opacity: 0.85 }}>
+          Every angler account — edit their info or remove their profile.
+        </p>
+        {allAnglers.length === 0 && <p style={{ color: COLORS.paperDim, fontSize: 13 }}>No angler accounts yet.</p>}
+        <div className="flex flex-col gap-2">
+          {allAnglers.map((a) => (
+            <AdminAccountCard
+              key={a.id}
+              account={a}
+              fields={[
+                { key: "firstName", label: "FIRST NAME" },
+                { key: "lastName", label: "LAST NAME" },
+                { key: "email", label: "EMAIL" },
+                { key: "phone", label: "PHONE" },
+                { key: "zip", label: "ZIP" },
+              ]}
+              onSave={(updates) => onUpdateAngler(a.id, updates)}
+              onDelete={() => onDeleteAngler(a.id)}
+            />
+          ))}
+        </div>
+        <p style={{ color: COLORS.paperDim, fontSize: 10.5, marginTop: 10, opacity: 0.7, lineHeight: 1.4 }}>
+          "Delete" removes their saved profile data, not their actual login — deleting a real login requires backend
+          admin tools we don't have set up yet. They could still log in and would just need to redo their profile.
+        </p>
       </div>
     </div>
   );
@@ -3690,6 +3797,25 @@ export default function LastCastApp() {
     });
     return () => unsubscribe();
   }, []);
+
+  // Every captain and angler account, for the admin's account management
+  // section — only actively listened to while an admin is logged in, so
+  // it's not pulling the whole database on every regular page load.
+  const [allCaptainAccounts, setAllCaptainAccounts] = useState([]);
+  const [allAnglerAccounts, setAllAnglerAccounts] = useState([]);
+  useEffect(() => {
+    if (!(side === "admin" && adminLoggedIn)) return;
+    const unsubCaptains = onSnapshot(collection(db, "captains"), (snapshot) => {
+      setAllCaptainAccounts(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+    const unsubAnglers = onSnapshot(collection(db, "anglers"), (snapshot) => {
+      setAllAnglerAccounts(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+    return () => {
+      unsubCaptains();
+      unsubAnglers();
+    };
+  }, [side, adminLoggedIn]);
 
   // Live status for whichever captain is currently logged in on this device —
   // updates automatically the moment an admin approves them, no refresh needed.
@@ -4219,6 +4345,40 @@ export default function LastCastApp() {
                 onRemoveSponsor={(id) => setSponsors((prev) => prev.filter((s) => s.id !== id))}
                 bookings={anglerBookings}
                 onBack={() => setSide("captain")}
+                allCaptains={allCaptainAccounts}
+                allAnglers={allAnglerAccounts}
+                onUpdateCaptain={async (id, updates) => {
+                  try {
+                    await updateDoc(doc(db, "captains", id), updates);
+                  } catch (err) {
+                    console.error("Failed to update captain:", err);
+                    alert(`Couldn't save: ${err.message || "unknown error"}`);
+                  }
+                }}
+                onDeleteCaptain={async (id) => {
+                  try {
+                    await deleteDoc(doc(db, "captains", id));
+                  } catch (err) {
+                    console.error("Failed to delete captain:", err);
+                    alert(`Couldn't delete: ${err.message || "unknown error"}`);
+                  }
+                }}
+                onUpdateAngler={async (id, updates) => {
+                  try {
+                    await updateDoc(doc(db, "anglers", id), updates);
+                  } catch (err) {
+                    console.error("Failed to update angler:", err);
+                    alert(`Couldn't save: ${err.message || "unknown error"}`);
+                  }
+                }}
+                onDeleteAngler={async (id) => {
+                  try {
+                    await deleteDoc(doc(db, "anglers", id));
+                  } catch (err) {
+                    console.error("Failed to delete angler:", err);
+                    alert(`Couldn't delete: ${err.message || "unknown error"}`);
+                  }
+                }}
               />
             )}
           </>
