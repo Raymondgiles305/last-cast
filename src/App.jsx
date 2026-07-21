@@ -1237,55 +1237,71 @@ function Home({ onSelect, onCaptainPortal, onAccount, angler, favoriteIds, onTog
 
         {angler?.militaryStatus && <ServiceBanner />}
 
-        <h1 style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 38, lineHeight: 1.05, color: COLORS.paper, letterSpacing: -0.5 }}>
-          Somebody's seat
-          <br />
-          just opened up.
-        </h1>
-        <p style={{ color: COLORS.paperDim, marginTop: 10, fontSize: 15 }}>
-          Real captains, real cancellations, seats at half price — before the clock runs out.
-        </p>
+        {tab === "deals" ? (
+          <>
+            <h1 style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 38, lineHeight: 1.05, color: COLORS.paper, letterSpacing: -0.5 }}>
+              Somebody's seat
+              <br />
+              just opened up.
+            </h1>
+            <p style={{ color: COLORS.paperDim, marginTop: 10, fontSize: 15 }}>
+              Real captains, real cancellations, seats at half price — before the clock runs out.
+            </p>
+          </>
+        ) : (
+          <>
+            <h1 style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 32, lineHeight: 1.1, color: COLORS.paper, letterSpacing: -0.5 }}>
+              Find your next trip.
+            </h1>
+            <p style={{ color: COLORS.paperDim, marginTop: 8, fontSize: 15 }}>
+              Browse regular trips, whole-boat charters, and everything you've saved.
+            </p>
+          </>
+        )}
 
-        <div className="mt-6 flex items-center gap-2 rounded-xl px-4 py-3" style={{ background: COLORS.paper }}>
-          <span style={{ opacity: 0.5 }}>⌕</span>
-          <input
-            value={searchDraft}
-            onChange={(e) => setSearchDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && searchDraft.trim()) {
-                onSearch(searchDraft.trim());
-              }
-            }}
-            placeholder="Search by location or species... (press Enter)"
-            className="flex-1 bg-transparent outline-none text-sm"
-            style={{ color: COLORS.ink }}
-          />
-        </div>
+        {tab !== "deals" && (
+          <div className="mt-6 flex items-center gap-2 rounded-xl px-4 py-3" style={{ background: COLORS.paper }}>
+            <span style={{ opacity: 0.5 }}>⌕</span>
+            <input
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && searchDraft.trim()) {
+                  onSearch(searchDraft.trim());
+                }
+              }}
+              placeholder="Search by location or species... (press Enter)"
+              className="flex-1 bg-transparent outline-none text-sm"
+              style={{ color: COLORS.ink }}
+            />
+          </div>
+        )}
 
-        <div className="flex gap-1.5 mt-5 overflow-x-auto pb-0.5">
-          {[
-            { key: "deals", label: "⏱ Deals" },
-            { key: "browse", label: "Browse" },
-            { key: "private", label: "Private" },
-            { key: "saved", label: `♥ Saved${favoriteIds.length ? ` (${favoriteIds.length})` : ""}` },
-          ].map((t) => {
-            const active = tab === t.key;
-            return (
-              <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
-                className="px-3.5 py-2 rounded-full text-sm font-medium whitespace-nowrap transition"
-                style={{
-                  background: active ? COLORS.rust : COLORS.inkSoft,
-                  border: `1px solid ${active ? COLORS.rust : COLORS.line}`,
-                  color: active ? COLORS.paper : COLORS.paperDim,
-                }}
-              >
-                {t.label}
-              </button>
-            );
-          })}
-        </div>
+        {tab !== "deals" && (
+          <div className="flex gap-1.5 mt-5 overflow-x-auto pb-0.5">
+            {[
+              { key: "browse", label: "Browse" },
+              { key: "private", label: "Private" },
+              { key: "saved", label: `♥ Saved${favoriteIds.length ? ` (${favoriteIds.length})` : ""}` },
+            ].map((t) => {
+              const active = tab === t.key;
+              return (
+                <button
+                  key={t.key}
+                  onClick={() => setTab(t.key)}
+                  className="px-3.5 py-2 rounded-full text-sm font-medium whitespace-nowrap transition"
+                  style={{
+                    background: active ? COLORS.rust : COLORS.inkSoft,
+                    border: `1px solid ${active ? COLORS.rust : COLORS.line}`,
+                    color: active ? COLORS.paper : COLORS.paperDim,
+                  }}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         <div className="flex gap-2 mt-4 overflow-x-auto pb-1">
           {CATEGORIES.map((c) => {
@@ -4269,7 +4285,7 @@ export default function LastCastApp() {
             )}
             {["home", "account"].includes(customerView) && (
               <BottomTabBar
-                active={customerView === "account" ? "profile" : homeTab === "browse" ? "charters" : "home"}
+                active={customerView === "account" ? "profile" : homeTab !== "deals" ? "charters" : "home"}
                 onHome={() => {
                   setCustomerView("home");
                   setHomeTab("deals");
