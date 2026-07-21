@@ -652,6 +652,39 @@ function BrandMark({ small }) {
   );
 }
 
+// Persistent bottom navigation for the customer app, matching the
+// Home / Charters / Profile pattern. "active" is one of "home", "charters",
+// or "profile" — computed by the shell from current view + Home sub-tab.
+function BottomTabBar({ active, onHome, onCharters, onProfile }) {
+  const items = [
+    { key: "home", label: "Home", icon: "🏠", onClick: onHome },
+    { key: "charters", label: "Charters", icon: "🎣", onClick: onCharters },
+    { key: "profile", label: "Profile", icon: "👤", onClick: onProfile },
+  ];
+  return (
+    <div
+      className="fixed bottom-0 left-0 right-0 flex items-stretch"
+      style={{ background: COLORS.ink, borderTop: `1px solid ${COLORS.line}`, maxWidth: 480, margin: "0 auto", zIndex: 40 }}
+    >
+      {items.map((item) => {
+        const isActive = active === item.key;
+        return (
+          <button
+            key={item.key}
+            onClick={item.onClick}
+            className="flex-1 flex flex-col items-center gap-0.5 py-2.5"
+          >
+            <span style={{ fontSize: 19, opacity: isActive ? 1 : 0.5 }}>{item.icon}</span>
+            <span style={{ fontSize: 10.5, color: isActive ? COLORS.paper : COLORS.paperDim, fontWeight: isActive ? 600 : 400 }}>
+              {item.label}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 // Shared by both anglers and captains — shown right after sign-up, or on
 // login if the account still hasn't verified its email. Uses Firebase's
 // real email verification, not a simulated one.
@@ -734,26 +767,46 @@ function Toggle({ checked, onChange }) {
 
 function AvatarUpload({ photoUrl, onChange, fallback, size = 88 }) {
   const inputRef = useRef(null);
-  const [preview, setPreview] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
 
-  const handleFile = async (e) => {
+  // No Firebase Storage on the free plan, so instead of uploading the
+  // original file, this shrinks it down first (max 300px, compressed JPEG)
+  // so the result is small enough to save directly in Firestore — usually
+  // just a few KB, well under its 1MB document limit.
+  const handleFile = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setError("");
-    setPreview(URL.createObjectURL(file)); // instant local preview while the real upload happens
     setUploading(true);
-    try {
-      await onChange(file);
-    } catch (err) {
-      setError(err.message || "Upload failed — please try again.");
-    } finally {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 300;
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const compressed = canvas.toDataURL("image/jpeg", 0.7);
+        Promise.resolve(onChange(compressed))
+          .catch((err) => setError(err.message || "Couldn't save photo — please try again."))
+          .finally(() => setUploading(false));
+      };
+      img.onerror = () => {
+        setError("Couldn't read that image — please try a different file.");
+        setUploading(false);
+      };
+      img.src = reader.result;
+    };
+    reader.onerror = () => {
+      setError("Couldn't read that file — please try again.");
       setUploading(false);
-    }
+    };
+    reader.readAsDataURL(file);
   };
-
-  const displayUrl = preview || photoUrl;
 
   return (
     <div className="flex items-center gap-4">
@@ -762,14 +815,14 @@ function AvatarUpload({ photoUrl, onChange, fallback, size = 88 }) {
         className="rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer relative overflow-hidden"
         style={{ width: size, height: size, background: COLORS.inkSoft, border: `1.5px dashed ${COLORS.line}` }}
       >
-        {displayUrl ? (
-          <img src={displayUrl} alt="Profile" className="w-full h-full object-cover" />
+        {photoUrl ? (
+          <img src={photoUrl} alt="Profile" className="w-full h-full object-cover" />
         ) : (
           <span style={{ fontSize: size * 0.4 }}>{fallback}</span>
         )}
         {uploading && (
           <div className="absolute inset-0 flex items-center justify-center" style={{ background: "rgba(14,27,34,0.55)" }}>
-            <span style={{ color: COLORS.paper, fontSize: 11 }}>Uploading...</span>
+            <span style={{ color: COLORS.paper, fontSize: 11 }}>Saving...</span>
           </div>
         )}
       </div>
@@ -779,9 +832,9 @@ function AvatarUpload({ photoUrl, onChange, fallback, size = 88 }) {
           className="px-3.5 py-2 rounded-full text-xs font-semibold"
           style={{ background: COLORS.teal, color: COLORS.ink }}
         >
-          {displayUrl ? "Change photo" : "Upload photo"}
+          {photoUrl ? "Change photo" : "Upload photo"}
         </button>
-        <p style={{ color: COLORS.paperDim, fontSize: 11, marginTop: 6, lineHeight: 1.4 }}>JPG or PNG, saved for real to your account.</p>
+        <p style={{ color: COLORS.paperDim, fontSize: 11, marginTop: 6, lineHeight: 1.4 }}>JPG or PNG, saved to your account.</p>
         {error && <p style={{ color: COLORS.rust, fontSize: 11, marginTop: 4 }}>{error}</p>}
       </div>
       <input ref={inputRef} type="file" accept="image/*" onChange={handleFile} className="hidden" />
@@ -1109,8 +1162,7 @@ function PrivateCharterCard({ c, onSelect, isFavorited, onToggleFavorite }) {
   );
 }
 
-function Home({ onSelect, onCaptainPortal, onAccount, angler, favoriteIds, onToggleFavorite, onSearch, realCharters }) {
-  const [tab, setTab] = useState("deals"); // "deals" | "browse" | "private" | "saved"
+function Home({ onSelect, onCaptainPortal, onAccount, angler, favoriteIds, onToggleFavorite, onSearch, realCharters, tab, setTab }) {
   const [category, setCategory] = useState("All");
   const [searchDraft, setSearchDraft] = useState("");
   const [nearMe, setNearMe] = useState(false);
@@ -1317,7 +1369,7 @@ function Home({ onSelect, onCaptainPortal, onAccount, angler, favoriteIds, onTog
         </div>
       )}
 
-      <div className="px-6 pt-2 pb-10" style={{ background: COLORS.ink }}>
+      <div className="px-6 pt-2 pb-24" style={{ background: COLORS.ink }}>
         <h2 style={{ fontFamily: SERIF, color: COLORS.paper, fontSize: 19, fontWeight: 600, marginBottom: 8 }}>
           {tab === "deals" ? "All open seats" : tab === "browse" ? "Upcoming charters" : tab === "private" ? "Whole-boat charters" : "Your saved charters"}
         </h2>
@@ -2241,7 +2293,7 @@ function AnglerAccount({ angler, bookings, onOpenTrip, onLogout, onBack, onSetti
   const cancelled = bookings.filter((b) => b.status === "cancelled");
 
   return (
-    <div className="px-6 pt-6 pb-16">
+    <div className="px-6 pt-6 pb-28">
       <div className="flex items-center justify-between mb-4">
         <button onClick={onBack} style={{ color: COLORS.paperDim, fontSize: 14 }}>
           ← Back to app
@@ -3804,6 +3856,7 @@ export default function LastCastApp() {
   const [sponsors, setSponsors] = useState([]);
   const [extraReviews, setExtraReviews] = useState({});
   const [favoriteIds, setFavoriteIds] = useState([]);
+  const [homeTab, setHomeTab] = useState("deals"); // "deals" | "browse" | "private" | "saved"
   const [pendingAnglerProfile, setPendingAnglerProfile] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const toggleFavorite = (id) =>
@@ -4012,6 +4065,8 @@ export default function LastCastApp() {
                   setCustomerView("search");
                 }}
                 realCharters={realCharters}
+                tab={homeTab}
+                setTab={setHomeTab}
               />
             )}
             {customerView === "search" && (
@@ -4210,6 +4265,20 @@ export default function LastCastApp() {
                     )
                   );
                 }}
+              />
+            )}
+            {["home", "account"].includes(customerView) && (
+              <BottomTabBar
+                active={customerView === "account" ? "profile" : homeTab === "browse" ? "charters" : "home"}
+                onHome={() => {
+                  setCustomerView("home");
+                  setHomeTab("deals");
+                }}
+                onCharters={() => {
+                  setCustomerView("home");
+                  setHomeTab("browse");
+                }}
+                onProfile={goAccount}
               />
             )}
           </>
