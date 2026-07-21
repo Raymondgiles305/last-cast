@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { auth, db } from "./firebase";
+import { auth, db, storage } from "./firebase";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -17,6 +17,7 @@ import {
   where,
   onSnapshot,
 } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 /* ---------------------------------------------------------------------
    SHARED DESIGN TOKENS
@@ -733,13 +734,27 @@ function Toggle({ checked, onChange }) {
 
 function AvatarUpload({ photoUrl, onChange, fallback, size = 88 }) {
   const inputRef = useRef(null);
-  const handleFile = (e) => {
+  const [preview, setPreview] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleFile = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => onChange(reader.result);
-    reader.readAsDataURL(file);
+    setError("");
+    setPreview(URL.createObjectURL(file)); // instant local preview while the real upload happens
+    setUploading(true);
+    try {
+      await onChange(file);
+    } catch (err) {
+      setError(err.message || "Upload failed — please try again.");
+    } finally {
+      setUploading(false);
+    }
   };
+
+  const displayUrl = preview || photoUrl;
+
   return (
     <div className="flex items-center gap-4">
       <div
@@ -747,10 +762,15 @@ function AvatarUpload({ photoUrl, onChange, fallback, size = 88 }) {
         className="rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer relative overflow-hidden"
         style={{ width: size, height: size, background: COLORS.inkSoft, border: `1.5px dashed ${COLORS.line}` }}
       >
-        {photoUrl ? (
-          <img src={photoUrl} alt="Profile" className="w-full h-full object-cover" />
+        {displayUrl ? (
+          <img src={displayUrl} alt="Profile" className="w-full h-full object-cover" />
         ) : (
           <span style={{ fontSize: size * 0.4 }}>{fallback}</span>
+        )}
+        {uploading && (
+          <div className="absolute inset-0 flex items-center justify-center" style={{ background: "rgba(14,27,34,0.55)" }}>
+            <span style={{ color: COLORS.paper, fontSize: 11 }}>Uploading...</span>
+          </div>
         )}
       </div>
       <div>
@@ -759,9 +779,10 @@ function AvatarUpload({ photoUrl, onChange, fallback, size = 88 }) {
           className="px-3.5 py-2 rounded-full text-xs font-semibold"
           style={{ background: COLORS.teal, color: COLORS.ink }}
         >
-          {photoUrl ? "Change photo" : "Upload photo"}
+          {displayUrl ? "Change photo" : "Upload photo"}
         </button>
-        <p style={{ color: COLORS.paperDim, fontSize: 11, marginTop: 6, lineHeight: 1.4 }}>JPG or PNG, saved on this device.</p>
+        <p style={{ color: COLORS.paperDim, fontSize: 11, marginTop: 6, lineHeight: 1.4 }}>JPG or PNG, saved for real to your account.</p>
+        {error && <p style={{ color: COLORS.rust, fontSize: 11, marginTop: 4 }}>{error}</p>}
       </div>
       <input ref={inputRef} type="file" accept="image/*" onChange={handleFile} className="hidden" />
     </div>
@@ -4125,7 +4146,12 @@ export default function LastCastApp() {
                   setCustomerView("tripDetail");
                 }}
                 onSettings={() => setCustomerView("anglerSettings")}
-                onPhotoChange={(dataUrl) => updateAnglerProfile({ photoUrl: dataUrl })}
+                onPhotoChange={async (file) => {
+                  const fileRef = ref(storage, `profile-photos/anglers/${angler.uid}-${Date.now()}`);
+                  await uploadBytes(fileRef, file);
+                  const url = await getDownloadURL(fileRef);
+                  await updateAnglerProfile({ photoUrl: url });
+                }}
                 onVerifyMilitary={(status) => updateAnglerProfile({ militaryStatus: status })}
                 onRemoveMilitary={() => updateAnglerProfile({ militaryStatus: null })}
               />
@@ -4277,7 +4303,12 @@ export default function LastCastApp() {
                 realBookings={realCaptainBookings}
                 onExit={goBackToApp}
                 onSettings={() => setCaptainView("settings")}
-                onPhotoChange={(dataUrl) => updateCaptainProfile({ photoUrl: dataUrl })}
+                onPhotoChange={async (file) => {
+                  const fileRef = ref(storage, `profile-photos/captains/${captain.uid}-${Date.now()}`);
+                  await uploadBytes(fileRef, file);
+                  const url = await getDownloadURL(fileRef);
+                  await updateCaptainProfile({ photoUrl: url });
+                }}
                 reviewReplies={reviewReplies}
                 onReplyReview={(key, text) => setReviewReplies((prev) => ({ ...prev, [key]: text }))}
                 onOpenBooking={(b) => {
